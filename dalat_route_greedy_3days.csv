@@ -1,0 +1,41 @@
+﻿day,stop,method,name,type,arrive,start_visit,end_visit,feasible,dist_km,rating,attraction_score,address,video_url
+1,1,Greedy,Sân Mây Đà Lạt,cafe,07:00,07:00,08:00,True,0.0,4.7,0.7974,"56 Hoàng Hoa Thám, Xuân Hương - Đà Lạt, Lâm Đồng 66000, Việt Nam",https://www.tiktok.com/@review.lt7/video/7603371406423887125
+1,2,Greedy,Soho Coffee Đà Lạt,cafe,08:00,08:00,09:00,True,0.41,4.9,0.3036,"21 Hoàng Hoa Thám, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@julepe.sheen/video/7601887338511289608
+1,3,Greedy,New Light Coffee,cafe,09:01,09:01,10:01,True,0.26,4.6,0.333,"3 bis Hoàng Hoa Thám, Đà Lạt, Lâm Đồng 66000, Việt Nam",https://www.tiktok.com/@new_light_coffee/video/7505778560313920785
+1,4,Greedy,Cafe Hot,cafe,10:03,10:03,11:03,True,1.14,4.5,0.3385,"59 Nguyễn Trãi, Lâm Viên - Đà Lạt, Lâm Đồng 66111, Việt Nam",https://www.tiktok.com/@yangho0910/video/7387663612401290517
+1,5,Greedy,Quảng Trường Lâm Viên,địa điểm checkin,11:05,11:05,11:35,True,1.14,4.5,0.3893,"Đ. Trần Quốc Toản, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@myandangdoiban999/video/7587644118529101072
+1,6,Greedy,Tiệm cơm Hồi Nớ,chợ quán,11:36,11:36,12:21,True,0.32,4.5,0.3155,"3B, 4 Trần Hưng Đạo, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@nghiabiu.daily/video/7617051471355350292
+1,7,Greedy,Lẩu gà lá é Tạo Ngộ,chợ quán,12:21,12:21,13:06,True,0.21,4.0,0.2965,"4A/5 Hẻm Cầu Đúc, Xuân Hương - Đà Lạt, Lâm Đồng 670000, Việt Nam",https://www.tiktok.com/@sayhihuy/video/7350238587985726738
+1,8,Greedy,Chợ đêm,chợ quán,13:09,17:30,18:15,True,1.19,4.2,0.3759,"Đường Nguyễn Thị Minh Khai, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@callmevyvo/video/7359542199014493448
+1,9,Greedy,Chợ Đà Lạt,chợ quán,18:15,18:15,19:00,True,0.19,4.5,0.2951,"chợ Đà Lạt, 24 Đường Nguyễn Thị Minh Khai, Xuân Hương - Đà Lạt, Lâm Đồng 02633, Việt Nam",https://www.tiktok.com/@ngotdichoi/video/7587357211525926164
+1,10,Greedy,Quán cafe Đà Lạt,cafe,19:00,19:00,20:00,True,0.17,4.4,0.3266,"6 Khu Hoà Bình, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@nhandian/video/7164729843039472922
+1,11,Greedy,Cơm niêu,chợ quán,20:03,20:03,20:48,True,1.26,4.8,0.354,"35-37 Đinh Tiên Hoàng, Xuân Hương - Đà Lạt, Lâm Đồng 66109, Việt Nam",https://www.tiktok.com/@tiemcomnieunhala/video/7344170952231570708
+1,12,Greedy,Đôi Đũa Có Cơm Niêu,quán ăn,20:49,20:49,21:34,False,0.86,4.8,0.32,"96 Đường Phù Đổng Thiên Vương, Lâm Viên - Đà Lạt, Lâm Đồng 67000, Việt Nam",https://www.tiktok.com/@doiduadalat/video/7503154580214091016
+1,13,Greedy,Quán lẩu cá tầm,chợ quán,20:52,20:52,21:37,False,1.34,4.8,0.3272,"Khu quy hoạch/Lô 75 Nguyễn Công Trứ, Xuân Hương - Đà Lạt, Lâm Đồng 67000, Việt Nam",https://www.tiktok.com/@nhandian/video/7580740804403039496
+1,14,Greedy,Say xưa,chợ quán,20:54,20:54,21:39,False,1.08,4.8,0.3072,"68 Phan Đình Phùng, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@bocauzotriiudalat/video/7524263642276105479
+2,1,Greedy,Maze bar,cafe,07:00,08:00,09:00,True,0.0,4.6,0.3088,"57 Phan Bội Châu, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@two_peas_abroad/video/7549937570201816342
+2,2,Greedy,Khoai Lang Nướng,chợ quán,09:03,16:30,17:15,True,1.71,4.9,0.36,"70 Pasteur, Xuân Hương - Đà Lạt, Lâm Đồng 670000, Việt Nam",https://www.tiktok.com/@quanngondalat/video/7532857742118096148
+2,3,Greedy,Quán cafe Thời Thanh Xuân,cafe,17:15,17:15,18:15,True,0.45,4.9,0.3456,"9 Đường Triệu Việt Vương, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@traveleverywhere.vn/video/7399602885719346450
+2,4,Greedy,Mộc Quán BBQ,chợ quán,18:19,18:19,19:04,True,1.66,4.8,0.3012,"Hẻm 59 Đường Đống Đa, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@tungnuitravel/video/7445286601103510801
+2,5,Greedy,Tiệm nướng trong rừng @Miền Du Mục,chợ quán,19:05,19:05,19:50,True,0.49,4.5,0.3267,"3 bis Đống Đa, Xuân Hương - Đà Lạt, Lâm Đồng 670000, Việt Nam",https://www.tiktok.com/@dieuhoang211/video/7523798698493545735
+2,6,Greedy,Thác Datanla,thiên nhiên,19:54,19:54,21:24,False,2.32,4.4,0.437,"QL20 Đèo Prenn, Xuân Hương - Đà Lạt, Lâm Đồng 66000, Việt Nam",https://www.tiktok.com/@tinhdidaydido.travelvlog/video/7602245369891704084
+2,7,Greedy,Datanla,chợ quán,19:55,19:55,20:40,False,0.24,4.3,0.3821,"Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@huevui98/video/7597422283459792136
+2,8,Greedy,Suối Bình Yên,thiên nhiên,19:57,19:57,21:27,False,0.87,4.4,0.5431,"Hoa Cẩm Tú Cầu, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@dieuhoang211/video/7523798698493545735
+2,9,Greedy,Hồ Tuyền Lâm,thiên nhiên,19:59,19:59,21:29,False,1.09,4.6,0.3248,"Hồ Tuyền Lâm, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@rng.m963/video/7558721922368867604
+2,10,Greedy,REO Campsite,địa điểm checkin,20:03,20:03,20:33,False,2.34,4.8,0.3117,"Đ. Hoa Hồng, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@reodalat/video/7494138513517071624
+2,11,Greedy,The Florest,địa điểm checkin,20:13,20:13,20:43,False,4.98,4.3,0.3375,"Thôn 4, Cam Ly - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@theflorestdalat/video/7598936749192023317
+2,12,Greedy,Mongo land,khác,20:20,20:20,21:05,False,3.34,4.5,0.3723,"Tổ 16 thôn 1, Tà Nung, Cam Ly - Đà Lạt, Lâm Đồng 670000, Việt Nam",https://www.tiktok.com/@two_peas_abroad/video/7549937570201816342
+2,13,Greedy,Gạch Since 1988 Cafe,cafe,20:21,20:21,21:21,False,0.3,4.9,0.3538,"thôn 3, Cam Ly - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@haannday/video/7631923500042800392
+3,1,Greedy,Làng Cù Lần,thiên nhiên,07:00,08:00,09:30,True,0.0,4.6,0.4048,"ĐT722, Lang Biang - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@bacxiuneee_/video/7605564991403560213
+3,2,Greedy,Đồi Mộng Mơ,thiên nhiên,09:50,09:50,11:20,True,10.35,4.3,0.3102,"Số 5 Đường Mai Anh Đào, Lâm Viên - Đà Lạt, Lâm Đồng 670000, Việt Nam",https://www.tiktok.com/@sk1p3r009/video/7497089146683542830
+3,3,Greedy,Hoàng Hôn,địa điểm checkin,11:22,11:22,11:52,True,0.95,4.9,0.3187,"37 Đường Trần Đại Nghĩa, Lâm Viên - Đà Lạt, Lâm Đồng 67000, Việt Nam",https://www.tiktok.com/@hachireview74/video/7460073643004022034
+3,4,Greedy,Tiệm cà phê Dốc thị,cafe,12:02,12:02,13:02,True,4.93,4.8,0.3681,"WFPJ+R2H, Xuân Trường - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@bananzidong/video/7452307410745658632
+3,5,Greedy,Cheo veo cà phê,cafe,13:03,13:03,14:03,True,0.32,4.5,0.3043,"116 Đ. Hùng Vương, Xuân Trường - Đà Lạt, Lâm Đồng 66000, Việt Nam",https://www.tiktok.com/@chagiotomthitsieungon/video/7598760559059750165
+3,6,Greedy,Miền Du Mục,cafe,14:03,14:03,15:03,True,0.38,4.3,0.3636,"Đường Lâm Văn Thạnh, Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@ericgoesto/video/7523077765306895646
+3,7,Greedy,Nha Ben Rung,cafe,15:06,15:06,16:06,True,1.07,4.8,0.4181,"Tổ Tây Hồ 2, Xuân Trường - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@tiemcaphenhabenrung/video/7493504577296223496
+3,8,Greedy,Cafe Lời Của Gió,cafe,16:10,16:10,17:10,True,2.31,4.2,0.3121,"Đường Huỳnh Tấn Phát, Xuân Trường - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@julepe.sheen/video/7371685175857564946
+3,9,Greedy,Chùa Linh Phước,địa điểm checkin,17:12,17:12,17:42,True,1.07,4.6,0.3837,"WFR5+57X, 120 Tự Phước, Trại Mát, Xuân Trường - Đà Lạt, Lâm Đồng 550000, Việt Nam",https://www.tiktok.com/@tuankien.hoangkimtravel/video/7634580167255510279
+3,10,Greedy,Cà phê Vùng Ngoại Ô Đà Lạt,cafe,17:47,17:47,18:47,True,2.15,4.9,0.3268,"Đường Đình Đa Quý, Đá Quý, Xuân Trường - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@sanmayvungngoaio/video/7638278348048698642
+3,11,Greedy,Cau Go San May,thiên nhiên,19:01,19:01,20:31,True,7.37,4.7,0.2976,"Trường Thọ, Xuân Trường - Đà Lạt, Lâm Đồng 66121, Việt Nam",https://www.tiktok.com/@tiemanhbaprangbo/video/7336046705617440007
+3,12,Greedy,Cau Gò Binh Minh,thiên nhiên,20:33,20:33,22:03,False,0.62,4.6,0.3831,"Đồi chè, Xuân Trường - Đà Lạt, Lâm Đồng, Việt Nam",https://www.tiktok.com/@sanmaycaugo_binhminh/video/7509742123164470546
+3,13,Greedy,Vườn thú Zoodoo,thiên nhiên,21:22,21:22,22:52,False,24.54,4.5,0.3711,"QL27C, Lạc Dương, Lâm Đồng, Việt Nam",https://www.tiktok.com/@grinlai/video/7636632967338560775

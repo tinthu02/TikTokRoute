@@ -1,0 +1,2102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_8dacb85a2fb387ef773cd379340de7e0 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-ant-path@1.1.2/dist/leaflet-ant-path.min.js"></script>
+</head>
+<body>
+    
+    
+    <div style="
+        position: fixed; bottom: 30px; left: 30px; z-index: 1000;
+        background: white; padding: 12px 16px; border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-family: Arial; font-size: 13px;
+    ">
+        <b>🗺️ Lộ trình Đà Lạt</b><br>
+        <span style="color:#E74C3C;">●</span> Ngày 1 &nbsp;
+        <span style="color:#2980B9;">●</span> Ngày 2 &nbsp;
+        <span style="color:#27AE60;">●</span> Ngày 3<br>
+        <span style="opacity:0.5">○</span> Infeasible (ngoài giờ mở cửa)
+    </div>
+    
+    
+            <div class="folium-map" id="map_8dacb85a2fb387ef773cd379340de7e0" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_8dacb85a2fb387ef773cd379340de7e0 = L.map(
+                "map_8dacb85a2fb387ef773cd379340de7e0",
+                {
+                    center: [11.9404, 108.4583],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 13,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_a3fa696a1bbad1e2cc7a2da62882130b = L.tileLayer(
+                "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 20,
+  "maxNativeZoom": 20,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors \u0026copy; \u003ca href=\"https://carto.com/attributions\"\u003eCARTO\u003c/a\u003e",
+  "subdomains": "abcd",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_a3fa696a1bbad1e2cc7a2da62882130b.addTo(map_8dacb85a2fb387ef773cd379340de7e0);
+        
+    
+            var feature_group_1d1ea0c9ff40592b26cb8acd86a4f843 = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var marker_fc64361b0a793d3b819273cd1f56abfa = L.marker(
+                [11.9039342, 108.3674764],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_05da2af66dc80d049977dce3a84554bd = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e1\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_19db7b9cd02f9a3b3619212dbb591562 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_927b7f6331a5cf300d23dd18971523b1 = $(`<div id="html_927b7f6331a5cf300d23dd18971523b1" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">1. The Florest</b><br>                 <span style="color:#666;">địa điểm checkin &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>07:00</b> – <b>07:30</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.3</b>                 &nbsp; 📊 Score: <b>0.3375</b><br>                 📍 Thôn 4, Cam Ly - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@theflorestdalat/video/7598936749192023317" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_19db7b9cd02f9a3b3619212dbb591562.setContent(html_927b7f6331a5cf300d23dd18971523b1);
+            
+        
+
+        marker_fc64361b0a793d3b819273cd1f56abfa.bindPopup(popup_19db7b9cd02f9a3b3619212dbb591562)
+        ;
+
+        
+    
+    
+            marker_fc64361b0a793d3b819273cd1f56abfa.bindTooltip(
+                `<div>
+                     Ngày 1 #1: The Florest
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_fc64361b0a793d3b819273cd1f56abfa.setIcon(div_icon_05da2af66dc80d049977dce3a84554bd);
+            
+    
+            var marker_c9f1b1ff74116071010437862f0e4fc2 = L.marker(
+                [11.8898505, 108.4109295],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_809a0ab27a12ed3409722ff8d15e5b08 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e2\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_4829c6b593fdb0b729c6c2c088b38fbc = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_18ca4ca73174d5b959a910c5027bb55e = $(`<div id="html_18ca4ca73174d5b959a910c5027bb55e" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">2. REO Campsite</b><br>                 <span style="color:#666;">địa điểm checkin &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>07:39</b> – <b>08:09</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.8</b>                 &nbsp; 📊 Score: <b>0.3117</b><br>                 📍 Đ. Hoa Hồng, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@reodalat/video/7494138513517071624" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_4829c6b593fdb0b729c6c2c088b38fbc.setContent(html_18ca4ca73174d5b959a910c5027bb55e);
+            
+        
+
+        marker_c9f1b1ff74116071010437862f0e4fc2.bindPopup(popup_4829c6b593fdb0b729c6c2c088b38fbc)
+        ;
+
+        
+    
+    
+            marker_c9f1b1ff74116071010437862f0e4fc2.bindTooltip(
+                `<div>
+                     Ngày 1 #2: REO Campsite
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_c9f1b1ff74116071010437862f0e4fc2.setIcon(div_icon_809a0ab27a12ed3409722ff8d15e5b08);
+            
+    
+            var marker_55da34aa7907200f5c12e6a1c4d82f75 = L.marker(
+                [11.944171, 108.4358881],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_4fc26cad120bb5d7034fc2beca4ec292 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e3\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_c3adb02e12543ef848a911b603dcdb11 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_f45346202285892a1eb42c8d31ed7496 = $(`<div id="html_f45346202285892a1eb42c8d31ed7496" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">3. Quán cafe Đà Lạt</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>08:23</b> – <b>09:23</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.4</b>                 &nbsp; 📊 Score: <b>0.3266</b><br>                 📍 6 Khu Hoà Bình, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@nhandian/video/7164729843039472922" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_c3adb02e12543ef848a911b603dcdb11.setContent(html_f45346202285892a1eb42c8d31ed7496);
+            
+        
+
+        marker_55da34aa7907200f5c12e6a1c4d82f75.bindPopup(popup_c3adb02e12543ef848a911b603dcdb11)
+        ;
+
+        
+    
+    
+            marker_55da34aa7907200f5c12e6a1c4d82f75.bindTooltip(
+                `<div>
+                     Ngày 1 #3: Quán cafe Đà Lạt
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_55da34aa7907200f5c12e6a1c4d82f75.setIcon(div_icon_4fc26cad120bb5d7034fc2beca4ec292);
+            
+    
+            var marker_c97dd43704924908750990c9eae9cdb1 = L.marker(
+                [11.9393622, 108.445203],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_3aea1d42792a3970ff35416522f05c25 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e4\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_83c0174471dbae6bdff146e3d58d06bf = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_44bd01b82c2cec13c15cc42e46f50af2 = $(`<div id="html_44bd01b82c2cec13c15cc42e46f50af2" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">4. Quảng Trường Lâm Viên</b><br>                 <span style="color:#666;">địa điểm checkin &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>09:25</b> – <b>09:55</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.5</b>                 &nbsp; 📊 Score: <b>0.3893</b><br>                 📍 Đ. Trần Quốc Toản, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@myandangdoiban999/video/7587644118529101072" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_83c0174471dbae6bdff146e3d58d06bf.setContent(html_44bd01b82c2cec13c15cc42e46f50af2);
+            
+        
+
+        marker_c97dd43704924908750990c9eae9cdb1.bindPopup(popup_83c0174471dbae6bdff146e3d58d06bf)
+        ;
+
+        
+    
+    
+            marker_c97dd43704924908750990c9eae9cdb1.bindTooltip(
+                `<div>
+                     Ngày 1 #4: Quảng Trường Lâm Viên
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_c97dd43704924908750990c9eae9cdb1.setIcon(div_icon_3aea1d42792a3970ff35416522f05c25);
+            
+    
+            var marker_99cf2ba82001bcef69b36184e9d60116 = L.marker(
+                [11.9353322, 108.4640877],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_196d9106e51e9e06cf6a99dd6f26c164 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e5\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_a85b67db0a547fb137690b5b0be3a9f5 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_df8e90452ffdabd49e022eb2ea793cb0 = $(`<div id="html_df8e90452ffdabd49e022eb2ea793cb0" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">5. Sân Mây Đà Lạt</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>09:59</b> – <b>10:59</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.7</b>                 &nbsp; 📊 Score: <b>0.7974</b><br>                 📍 56 Hoàng Hoa Thám, Xuân Hương - Đà Lạt, Lâm Đồng 66000, Việt Nam<br>                 <a href="https://www.tiktok.com/@review.lt7/video/7603371406423887125" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_a85b67db0a547fb137690b5b0be3a9f5.setContent(html_df8e90452ffdabd49e022eb2ea793cb0);
+            
+        
+
+        marker_99cf2ba82001bcef69b36184e9d60116.bindPopup(popup_a85b67db0a547fb137690b5b0be3a9f5)
+        ;
+
+        
+    
+    
+            marker_99cf2ba82001bcef69b36184e9d60116.bindTooltip(
+                `<div>
+                     Ngày 1 #5: Sân Mây Đà Lạt
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_99cf2ba82001bcef69b36184e9d60116.setIcon(div_icon_196d9106e51e9e06cf6a99dd6f26c164);
+            
+    
+            var marker_8a98f8d26a65870e5717d4c1fe3ea7f7 = L.marker(
+                [11.9371818, 108.4795608],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_3741d1d68feb37a5b6541e4e704271e0 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e6\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_65086114cf48a7851ebf4353a1ffe79a = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_66e432fb6fb9540eb401511f2d3c2c46 = $(`<div id="html_66e432fb6fb9540eb401511f2d3c2c46" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">6. Tiệm cà phê Dốc thị</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>11:03</b> – <b>12:03</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.8</b>                 &nbsp; 📊 Score: <b>0.3681</b><br>                 📍 WFPJ+R2H, Xuân Trường - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@bananzidong/video/7452307410745658632" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_65086114cf48a7851ebf4353a1ffe79a.setContent(html_66e432fb6fb9540eb401511f2d3c2c46);
+            
+        
+
+        marker_8a98f8d26a65870e5717d4c1fe3ea7f7.bindPopup(popup_65086114cf48a7851ebf4353a1ffe79a)
+        ;
+
+        
+    
+    
+            marker_8a98f8d26a65870e5717d4c1fe3ea7f7.bindTooltip(
+                `<div>
+                     Ngày 1 #6: Tiệm cà phê Dốc thị
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_8a98f8d26a65870e5717d4c1fe3ea7f7.setIcon(div_icon_3741d1d68feb37a5b6541e4e704271e0);
+            
+    
+            var marker_9d0da80d838c01ae2960eb722f7d45dc = L.marker(
+                [11.9341893, 108.4774209],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_f9738efe0fbc840edd05af53e7d923c0 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e7\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_80509ec8d3a265520f1412fa69752c2c = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_b9ec4a6232e80bbb6c2c5830a3587d91 = $(`<div id="html_b9ec4a6232e80bbb6c2c5830a3587d91" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">7. Nha Ben Rung</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>12:03</b> – <b>13:03</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.8</b>                 &nbsp; 📊 Score: <b>0.4181</b><br>                 📍 Tổ Tây Hồ 2, Xuân Trường - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@tiemcaphenhabenrung/video/7493504577296223496" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_80509ec8d3a265520f1412fa69752c2c.setContent(html_b9ec4a6232e80bbb6c2c5830a3587d91);
+            
+        
+
+        marker_9d0da80d838c01ae2960eb722f7d45dc.bindPopup(popup_80509ec8d3a265520f1412fa69752c2c)
+        ;
+
+        
+    
+    
+            marker_9d0da80d838c01ae2960eb722f7d45dc.bindTooltip(
+                `<div>
+                     Ngày 1 #7: Nha Ben Rung
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_9d0da80d838c01ae2960eb722f7d45dc.setIcon(div_icon_f9738efe0fbc840edd05af53e7d923c0);
+            
+    
+            var marker_4b1f144f9de6ca406d2b015f5aaeb593 = L.marker(
+                [11.9381566, 108.4823005],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_52e25cc0ddbb0c10ea93ea805ee7e4ad = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e8\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_b87b8ab311832b461d7c7794f3a542e4 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_b3e725b8effd437733f7081ceec1322c = $(`<div id="html_b3e725b8effd437733f7081ceec1322c" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">8. Cheo veo cà phê</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>13:05</b> – <b>14:05</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.5</b>                 &nbsp; 📊 Score: <b>0.3043</b><br>                 📍 116 Đ. Hùng Vương, Xuân Trường - Đà Lạt, Lâm Đồng 66000, Việt Nam<br>                 <a href="https://www.tiktok.com/@chagiotomthitsieungon/video/7598760559059750165" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_b87b8ab311832b461d7c7794f3a542e4.setContent(html_b3e725b8effd437733f7081ceec1322c);
+            
+        
+
+        marker_4b1f144f9de6ca406d2b015f5aaeb593.bindPopup(popup_b87b8ab311832b461d7c7794f3a542e4)
+        ;
+
+        
+    
+    
+            marker_4b1f144f9de6ca406d2b015f5aaeb593.bindTooltip(
+                `<div>
+                     Ngày 1 #8: Cheo veo cà phê
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_4b1f144f9de6ca406d2b015f5aaeb593.setIcon(div_icon_52e25cc0ddbb0c10ea93ea805ee7e4ad);
+            
+    
+            var marker_411e63b57da2b88fe5616e087713dc86 = L.marker(
+                [11.949984, 108.4911826],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_bc67dfe47d48a7a2cd9cb417bb2de26e = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e9\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_ac69e7421e738c5445ca1f08306e2599 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_b22b7bbef45774417410eee92e7a394a = $(`<div id="html_b22b7bbef45774417410eee92e7a394a" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">9. Cafe Lời Của Gió</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>14:08</b> – <b>15:08</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.2</b>                 &nbsp; 📊 Score: <b>0.3121</b><br>                 📍 Đường Huỳnh Tấn Phát, Xuân Trường - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@julepe.sheen/video/7371685175857564946" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_ac69e7421e738c5445ca1f08306e2599.setContent(html_b22b7bbef45774417410eee92e7a394a);
+            
+        
+
+        marker_411e63b57da2b88fe5616e087713dc86.bindPopup(popup_ac69e7421e738c5445ca1f08306e2599)
+        ;
+
+        
+    
+    
+            marker_411e63b57da2b88fe5616e087713dc86.bindTooltip(
+                `<div>
+                     Ngày 1 #9: Cafe Lời Của Gió
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_411e63b57da2b88fe5616e087713dc86.setIcon(div_icon_bc67dfe47d48a7a2cd9cb417bb2de26e);
+            
+    
+            var marker_1f13e460eee1b71fa4b62127d5bfae4b = L.marker(
+                [11.940508, 108.4848853],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_57bde113ef90f05dc5916530538d8821 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e10\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_fa7ab3b0e7eab6bf41a267b9c71ef94b = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_46a8176f12cb6ae9dda5663c44c1002f = $(`<div id="html_46a8176f12cb6ae9dda5663c44c1002f" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">10. Miền Du Mục</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>15:11</b> – <b>16:11</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.3</b>                 &nbsp; 📊 Score: <b>0.3636</b><br>                 📍 Đường Lâm Văn Thạnh, Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@ericgoesto/video/7523077765306895646" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_fa7ab3b0e7eab6bf41a267b9c71ef94b.setContent(html_46a8176f12cb6ae9dda5663c44c1002f);
+            
+        
+
+        marker_1f13e460eee1b71fa4b62127d5bfae4b.bindPopup(popup_fa7ab3b0e7eab6bf41a267b9c71ef94b)
+        ;
+
+        
+    
+    
+            marker_1f13e460eee1b71fa4b62127d5bfae4b.bindTooltip(
+                `<div>
+                     Ngày 1 #10: Miền Du Mục
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_1f13e460eee1b71fa4b62127d5bfae4b.setIcon(div_icon_57bde113ef90f05dc5916530538d8821);
+            
+    
+            var marker_244703739f9375fbfb3ec1623cce43b5 = L.marker(
+                [11.9446332, 108.4993224],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_c7cd5ac573980944c44a01b5629fd42c = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e11\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_9f649aac60f1858bb6850e3523462bf5 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_2e01ee19717231d9cd87d6803cb0b2f6 = $(`<div id="html_2e01ee19717231d9cd87d6803cb0b2f6" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">11. Chùa Linh Phước</b><br>                 <span style="color:#666;">địa điểm checkin &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>16:14</b> – <b>16:44</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.6</b>                 &nbsp; 📊 Score: <b>0.3837</b><br>                 📍 WFR5+57X, 120 Tự Phước, Trại Mát, Xuân Trường - Đà Lạt, Lâm Đồng 550000, Việt Nam<br>                 <a href="https://www.tiktok.com/@tuankien.hoangkimtravel/video/7634580167255510279" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_9f649aac60f1858bb6850e3523462bf5.setContent(html_2e01ee19717231d9cd87d6803cb0b2f6);
+            
+        
+
+        marker_244703739f9375fbfb3ec1623cce43b5.bindPopup(popup_9f649aac60f1858bb6850e3523462bf5)
+        ;
+
+        
+    
+    
+            marker_244703739f9375fbfb3ec1623cce43b5.bindTooltip(
+                `<div>
+                     Ngày 1 #11: Chùa Linh Phước
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_244703739f9375fbfb3ec1623cce43b5.setIcon(div_icon_c7cd5ac573980944c44a01b5629fd42c);
+            
+    
+            var marker_61ee3ae5d96239e715ab99523100664f = L.marker(
+                [11.9299258, 108.5121744],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_2aae9e121cbff28fac5db24cb87cef02 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e12\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_a3d7469673db7618d49507904a8b9a09 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_8f46c0ce20e48c61989cf561a6a01155 = $(`<div id="html_8f46c0ce20e48c61989cf561a6a01155" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">12. Cà phê Vùng Ngoại Ô Đà Lạt</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>16:48</b> – <b>17:48</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.9</b>                 &nbsp; 📊 Score: <b>0.3268</b><br>                 📍 Đường Đình Đa Quý, Đá Quý, Xuân Trường - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@sanmayvungngoaio/video/7638278348048698642" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_a3d7469673db7618d49507904a8b9a09.setContent(html_8f46c0ce20e48c61989cf561a6a01155);
+            
+        
+
+        marker_61ee3ae5d96239e715ab99523100664f.bindPopup(popup_a3d7469673db7618d49507904a8b9a09)
+        ;
+
+        
+    
+    
+            marker_61ee3ae5d96239e715ab99523100664f.bindTooltip(
+                `<div>
+                     Ngày 1 #12: Cà phê Vùng Ngoại Ô Đà Lạt
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_61ee3ae5d96239e715ab99523100664f.setIcon(div_icon_2aae9e121cbff28fac5db24cb87cef02);
+            
+    
+            var marker_075ff0ac41450c6b3c21052030eb6d8e = L.marker(
+                [11.8916145, 108.5737046],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_63166187c051fbf488ecaebae127e6af = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 0.5;\n                    \"\u003e13\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_f9e0e32706b3f0ffc513c750b43001e3 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_ced0bfad46323a9c025064e765ee19de = $(`<div id="html_ced0bfad46323a9c025064e765ee19de" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">13. Cau Gò Binh Minh</b><br>                 <span style="color:#666;">thiên nhiên &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>18:04</b> – <b>19:34</b>                 &nbsp; ⚠️ Ngoài giờ<br>                 ⭐ Rating: <b>4.6</b>                 &nbsp; 📊 Score: <b>0.3831</b><br>                 📍 Đồi chè, Xuân Trường - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@sanmaycaugo_binhminh/video/7509742123164470546" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_f9e0e32706b3f0ffc513c750b43001e3.setContent(html_ced0bfad46323a9c025064e765ee19de);
+            
+        
+
+        marker_075ff0ac41450c6b3c21052030eb6d8e.bindPopup(popup_f9e0e32706b3f0ffc513c750b43001e3)
+        ;
+
+        
+    
+    
+            marker_075ff0ac41450c6b3c21052030eb6d8e.bindTooltip(
+                `<div>
+                     Ngày 1 #13: Cau Gò Binh Minh
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_075ff0ac41450c6b3c21052030eb6d8e.setIcon(div_icon_63166187c051fbf488ecaebae127e6af);
+            
+    
+            var marker_9cbed16ea81366afdd8d148f24fa222d = L.marker(
+                [11.8924324, 108.5680309],
+                {
+}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            var div_icon_ffa684bb2c7f4e61ee670f9eee2b11f5 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#E74C3C;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e14\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_53df836c20bd6655d32bc25aacf613a1 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_8d67e591a37591ea487f06121b86b514 = $(`<div id="html_8d67e591a37591ea487f06121b86b514" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#E74C3C; font-size:15px;">14. Cau Go San May</b><br>                 <span style="color:#666;">thiên nhiên &nbsp;|&nbsp; Ngày 1</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>18:05</b> – <b>19:35</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.7</b>                 &nbsp; 📊 Score: <b>0.2976</b><br>                 📍 Trường Thọ, Xuân Trường - Đà Lạt, Lâm Đồng 66121, Việt Nam<br>                 <a href="https://www.tiktok.com/@tiemanhbaprangbo/video/7336046705617440007" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_53df836c20bd6655d32bc25aacf613a1.setContent(html_8d67e591a37591ea487f06121b86b514);
+            
+        
+
+        marker_9cbed16ea81366afdd8d148f24fa222d.bindPopup(popup_53df836c20bd6655d32bc25aacf613a1)
+        ;
+
+        
+    
+    
+            marker_9cbed16ea81366afdd8d148f24fa222d.bindTooltip(
+                `<div>
+                     Ngày 1 #14: Cau Go San May
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_9cbed16ea81366afdd8d148f24fa222d.setIcon(div_icon_ffa684bb2c7f4e61ee670f9eee2b11f5);
+            
+    
+            var poly_line_5bf74860e5f50654ec1e5d047bf52da4 = L.polyline(
+                [[11.9039342, 108.3674764], [11.8898505, 108.4109295], [11.944171, 108.4358881], [11.9393622, 108.445203], [11.9353322, 108.4640877], [11.9371818, 108.4795608], [11.9341893, 108.4774209], [11.9381566, 108.4823005], [11.949984, 108.4911826], [11.940508, 108.4848853], [11.9446332, 108.4993224], [11.9299258, 108.5121744], [11.8916145, 108.5737046], [11.8924324, 108.5680309]],
+                {"bubblingMouseEvents": true, "color": "#E74C3C", "dashArray": "8 4", "dashOffset": null, "fill": false, "fillColor": "#E74C3C", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            poly_line_5bf74860e5f50654ec1e5d047bf52da4.bindTooltip(
+                `<div>
+                     Lộ trình Ngày 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            ant_path_2946f1ab6f3b0762c850073271145c6e = L.polyline.antPath(
+              [[11.9039342, 108.3674764], [11.8898505, 108.4109295], [11.944171, 108.4358881], [11.9393622, 108.445203], [11.9353322, 108.4640877], [11.9371818, 108.4795608], [11.9341893, 108.4774209], [11.9381566, 108.4823005], [11.949984, 108.4911826], [11.940508, 108.4848853], [11.9446332, 108.4993224], [11.9299258, 108.5121744], [11.8916145, 108.5737046], [11.8924324, 108.5680309]],
+              {
+  "stroke": true,
+  "color": "#E74C3C",
+  "weight": 3,
+  "opacity": 0.5,
+  "lineCap": "round",
+  "lineJoin": "round",
+  "dashArray": [
+10,
+20,
+],
+  "dashOffset": null,
+  "fill": false,
+  "fillColor": "#E74C3C",
+  "fillOpacity": 0.2,
+  "fillRule": "evenodd",
+  "bubblingMouseEvents": true,
+  "smoothFactor": 1.0,
+  "noClip": false,
+  "paused": false,
+  "reverse": false,
+  "hardwareAcceleration": false,
+  "delay": 800,
+  "pulseColor": "#FFFFFF",
+}
+        ).addTo(feature_group_1d1ea0c9ff40592b26cb8acd86a4f843);
+        
+    
+            feature_group_1d1ea0c9ff40592b26cb8acd86a4f843.addTo(map_8dacb85a2fb387ef773cd379340de7e0);
+        
+    
+            var feature_group_c3b4acfdef5e71398b5baf0e307b86de = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var marker_8a377447aecca3d65edac509155987c6 = L.marker(
+                [11.8998298, 108.4298302],
+                {
+}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            var div_icon_e5081b6dc486a61084a13b7d3b6c5b3f = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#2980B9;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e1\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_c776c540f555ebb8496f4c787210b477 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_527c46ba7ff7aff19c8e36a44e4c62e4 = $(`<div id="html_527c46ba7ff7aff19c8e36a44e4c62e4" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#2980B9; font-size:15px;">1. Hồ Tuyền Lâm</b><br>                 <span style="color:#666;">thiên nhiên &nbsp;|&nbsp; Ngày 2</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>07:00</b> – <b>08:30</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.6</b>                 &nbsp; 📊 Score: <b>0.3248</b><br>                 📍 Hồ Tuyền Lâm, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@rng.m963/video/7558721922368867604" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_c776c540f555ebb8496f4c787210b477.setContent(html_527c46ba7ff7aff19c8e36a44e4c62e4);
+            
+        
+
+        marker_8a377447aecca3d65edac509155987c6.bindPopup(popup_c776c540f555ebb8496f4c787210b477)
+        ;
+
+        
+    
+    
+            marker_8a377447aecca3d65edac509155987c6.bindTooltip(
+                `<div>
+                     Ngày 2 #1: Hồ Tuyền Lâm
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_8a377447aecca3d65edac509155987c6.setIcon(div_icon_e5081b6dc486a61084a13b7d3b6c5b3f);
+            
+    
+            var marker_df315b2e7025ba3c978523a7a80c7f85 = L.marker(
+                [11.9018417, 108.4396697],
+                {
+}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            var div_icon_f6a82ebf92b90ae3eabc1c9e7d8a3265 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#2980B9;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e2\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_d1310d4024bdcba0f3d2c76f2ab094db = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_f56ae011671f695a183c3a8ed2e23daf = $(`<div id="html_f56ae011671f695a183c3a8ed2e23daf" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#2980B9; font-size:15px;">2. Suối Bình Yên</b><br>                 <span style="color:#666;">thiên nhiên &nbsp;|&nbsp; Ngày 2</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>08:32</b> – <b>10:02</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.4</b>                 &nbsp; 📊 Score: <b>0.5431</b><br>                 📍 Hoa Cẩm Tú Cầu, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@dieuhoang211/video/7523798698493545735" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_d1310d4024bdcba0f3d2c76f2ab094db.setContent(html_f56ae011671f695a183c3a8ed2e23daf);
+            
+        
+
+        marker_df315b2e7025ba3c978523a7a80c7f85.bindPopup(popup_d1310d4024bdcba0f3d2c76f2ab094db)
+        ;
+
+        
+    
+    
+            marker_df315b2e7025ba3c978523a7a80c7f85.bindTooltip(
+                `<div>
+                     Ngày 2 #2: Suối Bình Yên
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_df315b2e7025ba3c978523a7a80c7f85.setIcon(div_icon_f6a82ebf92b90ae3eabc1c9e7d8a3265);
+            
+    
+            var marker_e00c2a6199922c627b0c10aac53976e2 = L.marker(
+                [11.9029656, 108.447548],
+                {
+}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            var div_icon_8652a9597eb369d14024581364da090f = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#2980B9;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e3\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_41749943f9fac09e71c3569e28989c0a = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_92991f22735a14a02934d7f801e3112e = $(`<div id="html_92991f22735a14a02934d7f801e3112e" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#2980B9; font-size:15px;">3. Datanla</b><br>                 <span style="color:#666;">chợ quán &nbsp;|&nbsp; Ngày 2</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>10:03</b> – <b>10:48</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.3</b>                 &nbsp; 📊 Score: <b>0.3821</b><br>                 📍 Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@huevui98/video/7597422283459792136" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_41749943f9fac09e71c3569e28989c0a.setContent(html_92991f22735a14a02934d7f801e3112e);
+            
+        
+
+        marker_e00c2a6199922c627b0c10aac53976e2.bindPopup(popup_41749943f9fac09e71c3569e28989c0a)
+        ;
+
+        
+    
+    
+            marker_e00c2a6199922c627b0c10aac53976e2.bindTooltip(
+                `<div>
+                     Ngày 2 #3: Datanla
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_e00c2a6199922c627b0c10aac53976e2.setIcon(div_icon_8652a9597eb369d14024581364da090f);
+            
+    
+            var marker_6f6074bad6b5f7e06dad66706c1925a7 = L.marker(
+                [11.9034324, 108.4496999],
+                {
+}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            var div_icon_a089712346c3ac8ba4c82a7b9413eebf = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#2980B9;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e4\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_45050dd4835952b8bfffb555344ccb5a = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_c846a1233a20d26ac888e85c4cd15fa8 = $(`<div id="html_c846a1233a20d26ac888e85c4cd15fa8" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#2980B9; font-size:15px;">4. Thác Datanla</b><br>                 <span style="color:#666;">thiên nhiên &nbsp;|&nbsp; Ngày 2</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>10:49</b> – <b>12:19</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.4</b>                 &nbsp; 📊 Score: <b>0.437</b><br>                 📍 QL20 Đèo Prenn, Xuân Hương - Đà Lạt, Lâm Đồng 66000, Việt Nam<br>                 <a href="https://www.tiktok.com/@tinhdidaydido.travelvlog/video/7602245369891704084" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_45050dd4835952b8bfffb555344ccb5a.setContent(html_c846a1233a20d26ac888e85c4cd15fa8);
+            
+        
+
+        marker_6f6074bad6b5f7e06dad66706c1925a7.bindPopup(popup_45050dd4835952b8bfffb555344ccb5a)
+        ;
+
+        
+    
+    
+            marker_6f6074bad6b5f7e06dad66706c1925a7.bindTooltip(
+                `<div>
+                     Ngày 2 #4: Thác Datanla
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_6f6074bad6b5f7e06dad66706c1925a7.setIcon(div_icon_a089712346c3ac8ba4c82a7b9413eebf);
+            
+    
+            var marker_1e3b75894513fddcef2f53ad6479ad20 = L.marker(
+                [11.953686, 108.4421459],
+                {
+}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            var div_icon_0a81f2bba7b95b47c1828b58de59170d = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#2980B9;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e5\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_bd5e644a2d3eb827761986edf6880e4d = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_e2d8ec62616dea438f69b1d419528fc9 = $(`<div id="html_e2d8ec62616dea438f69b1d419528fc9" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#2980B9; font-size:15px;">5. Cơm niêu</b><br>                 <span style="color:#666;">chợ quán &nbsp;|&nbsp; Ngày 2</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>12:30</b> – <b>13:15</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.8</b>                 &nbsp; 📊 Score: <b>0.354</b><br>                 📍 35-37 Đinh Tiên Hoàng, Xuân Hương - Đà Lạt, Lâm Đồng 66109, Việt Nam<br>                 <a href="https://www.tiktok.com/@tiemcomnieunhala/video/7344170952231570708" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_bd5e644a2d3eb827761986edf6880e4d.setContent(html_e2d8ec62616dea438f69b1d419528fc9);
+            
+        
+
+        marker_1e3b75894513fddcef2f53ad6479ad20.bindPopup(popup_bd5e644a2d3eb827761986edf6880e4d)
+        ;
+
+        
+    
+    
+            marker_1e3b75894513fddcef2f53ad6479ad20.bindTooltip(
+                `<div>
+                     Ngày 2 #5: Cơm niêu
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_1e3b75894513fddcef2f53ad6479ad20.setIcon(div_icon_0a81f2bba7b95b47c1828b58de59170d);
+            
+    
+            var marker_977a2e8595fbe6ffea08ae36a960a966 = L.marker(
+                [11.9546144, 108.4327345],
+                {
+}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            var div_icon_5f81f1ee17956f047f5dabe5d2369726 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#2980B9;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e6\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_faf004e5a2a308a665387ccefaaa9aff = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_c2d82a864f8679731f685fba7b641c7e = $(`<div id="html_c2d82a864f8679731f685fba7b641c7e" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#2980B9; font-size:15px;">6. Quán lẩu cá tầm</b><br>                 <span style="color:#666;">chợ quán &nbsp;|&nbsp; Ngày 2</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>13:17</b> – <b>14:02</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.8</b>                 &nbsp; 📊 Score: <b>0.3272</b><br>                 📍 Khu quy hoạch/Lô 75 Nguyễn Công Trứ, Xuân Hương - Đà Lạt, Lâm Đồng 67000, Việt Nam<br>                 <a href="https://www.tiktok.com/@nhandian/video/7580740804403039496" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_faf004e5a2a308a665387ccefaaa9aff.setContent(html_c2d82a864f8679731f685fba7b641c7e);
+            
+        
+
+        marker_977a2e8595fbe6ffea08ae36a960a966.bindPopup(popup_faf004e5a2a308a665387ccefaaa9aff)
+        ;
+
+        
+    
+    
+            marker_977a2e8595fbe6ffea08ae36a960a966.bindTooltip(
+                `<div>
+                     Ngày 2 #6: Quán lẩu cá tầm
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_977a2e8595fbe6ffea08ae36a960a966.setIcon(div_icon_5f81f1ee17956f047f5dabe5d2369726);
+            
+    
+            var marker_d95f6a3258ba3982a67b2f762281dfdd = L.marker(
+                [11.9391984, 108.4480242],
+                {
+}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            var div_icon_09fd04c6b80002b59e10617278431f9b = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#2980B9;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e7\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_47aeeb72cf856cbc4fd6ba5ef94493b2 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_3c2896b0d540d87d6d3c72c6e21e0308 = $(`<div id="html_3c2896b0d540d87d6d3c72c6e21e0308" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#2980B9; font-size:15px;">7. Lẩu gà lá é Tạo Ngộ</b><br>                 <span style="color:#666;">chợ quán &nbsp;|&nbsp; Ngày 2</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>14:07</b> – <b>14:52</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.0</b>                 &nbsp; 📊 Score: <b>0.2965</b><br>                 📍 4A/5 Hẻm Cầu Đúc, Xuân Hương - Đà Lạt, Lâm Đồng 670000, Việt Nam<br>                 <a href="https://www.tiktok.com/@sayhihuy/video/7350238587985726738" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_47aeeb72cf856cbc4fd6ba5ef94493b2.setContent(html_3c2896b0d540d87d6d3c72c6e21e0308);
+            
+        
+
+        marker_d95f6a3258ba3982a67b2f762281dfdd.bindPopup(popup_47aeeb72cf856cbc4fd6ba5ef94493b2)
+        ;
+
+        
+    
+    
+            marker_d95f6a3258ba3982a67b2f762281dfdd.bindTooltip(
+                `<div>
+                     Ngày 2 #7: Lẩu gà lá é Tạo Ngộ
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_d95f6a3258ba3982a67b2f762281dfdd.setIcon(div_icon_09fd04c6b80002b59e10617278431f9b);
+            
+    
+            var marker_9f94ebe8959c7d44c0937115d5be6ba4 = L.marker(
+                [11.9373916, 108.4473933],
+                {
+}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            var div_icon_1953c06925039336642993107d95e8b6 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#2980B9;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e8\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_38922193512e464d9fc8001b2deddebd = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_7f297bf8dd4a19cfdb87b9f875965b01 = $(`<div id="html_7f297bf8dd4a19cfdb87b9f875965b01" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#2980B9; font-size:15px;">8. Tiệm cơm Hồi Nớ</b><br>                 <span style="color:#666;">chợ quán &nbsp;|&nbsp; Ngày 2</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>14:52</b> – <b>15:37</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.5</b>                 &nbsp; 📊 Score: <b>0.3155</b><br>                 📍 3B, 4 Trần Hưng Đạo, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@nghiabiu.daily/video/7617051471355350292" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_38922193512e464d9fc8001b2deddebd.setContent(html_7f297bf8dd4a19cfdb87b9f875965b01);
+            
+        
+
+        marker_9f94ebe8959c7d44c0937115d5be6ba4.bindPopup(popup_38922193512e464d9fc8001b2deddebd)
+        ;
+
+        
+    
+    
+            marker_9f94ebe8959c7d44c0937115d5be6ba4.bindTooltip(
+                `<div>
+                     Ngày 2 #8: Tiệm cơm Hồi Nớ
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_9f94ebe8959c7d44c0937115d5be6ba4.setIcon(div_icon_1953c06925039336642993107d95e8b6);
+            
+    
+            var marker_11e4a0d55cbf428d1b7c1a2f879619d5 = L.marker(
+                [11.9409927, 108.4642694],
+                {
+}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            var div_icon_bf9e904094cb4324a0280a0381a68390 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#2980B9;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e9\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_aba0fe5f160139093b6e0edc3658e422 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_cd279acf28f9757a44a19b5cf92f37e9 = $(`<div id="html_cd279acf28f9757a44a19b5cf92f37e9" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#2980B9; font-size:15px;">9. New Light Coffee</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 2</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>15:41</b> – <b>16:41</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.6</b>                 &nbsp; 📊 Score: <b>0.333</b><br>                 📍 3 bis Hoàng Hoa Thám, Đà Lạt, Lâm Đồng 66000, Việt Nam<br>                 <a href="https://www.tiktok.com/@new_light_coffee/video/7505778560313920785" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_aba0fe5f160139093b6e0edc3658e422.setContent(html_cd279acf28f9757a44a19b5cf92f37e9);
+            
+        
+
+        marker_11e4a0d55cbf428d1b7c1a2f879619d5.bindPopup(popup_aba0fe5f160139093b6e0edc3658e422)
+        ;
+
+        
+    
+    
+            marker_11e4a0d55cbf428d1b7c1a2f879619d5.bindTooltip(
+                `<div>
+                     Ngày 2 #9: New Light Coffee
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_11e4a0d55cbf428d1b7c1a2f879619d5.setIcon(div_icon_bf9e904094cb4324a0280a0381a68390);
+            
+    
+            var marker_476d7944d6aa402f42df8daaeab1c36f = L.marker(
+                [11.9389445, 108.4631401],
+                {
+}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            var div_icon_0f0b58241c12f73e8c99ccd9fe98d776 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#2980B9;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e10\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_0dfcd9dc9cba0150c722c86e6330371a = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_63b3da95f66ccd3b02af3801ec91f1d8 = $(`<div id="html_63b3da95f66ccd3b02af3801ec91f1d8" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#2980B9; font-size:15px;">10. Soho Coffee Đà Lạt</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 2</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>16:42</b> – <b>17:42</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.9</b>                 &nbsp; 📊 Score: <b>0.3036</b><br>                 📍 21 Hoàng Hoa Thám, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@julepe.sheen/video/7601887338511289608" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_0dfcd9dc9cba0150c722c86e6330371a.setContent(html_63b3da95f66ccd3b02af3801ec91f1d8);
+            
+        
+
+        marker_476d7944d6aa402f42df8daaeab1c36f.bindPopup(popup_0dfcd9dc9cba0150c722c86e6330371a)
+        ;
+
+        
+    
+    
+            marker_476d7944d6aa402f42df8daaeab1c36f.bindTooltip(
+                `<div>
+                     Ngày 2 #10: Soho Coffee Đà Lạt
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_476d7944d6aa402f42df8daaeab1c36f.setIcon(div_icon_0f0b58241c12f73e8c99ccd9fe98d776);
+            
+    
+            var marker_3849e74a1fa04b0e39fcb330f45df094 = L.marker(
+                [11.9443445, 108.4543587],
+                {
+}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            var div_icon_452728c5e7d7c2eeeff0bacfad8d54f7 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#2980B9;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e11\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_c185192d7a3cf4c47a5559b461e2036f = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_bf8f4f01d7b11ce237806e3524706c95 = $(`<div id="html_bf8f4f01d7b11ce237806e3524706c95" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#2980B9; font-size:15px;">11. Cafe Hot</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 2</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>17:44</b> – <b>18:44</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.5</b>                 &nbsp; 📊 Score: <b>0.3385</b><br>                 📍 59 Nguyễn Trãi, Lâm Viên - Đà Lạt, Lâm Đồng 66111, Việt Nam<br>                 <a href="https://www.tiktok.com/@yangho0910/video/7387663612401290517" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_c185192d7a3cf4c47a5559b461e2036f.setContent(html_bf8f4f01d7b11ce237806e3524706c95);
+            
+        
+
+        marker_3849e74a1fa04b0e39fcb330f45df094.bindPopup(popup_c185192d7a3cf4c47a5559b461e2036f)
+        ;
+
+        
+    
+    
+            marker_3849e74a1fa04b0e39fcb330f45df094.bindTooltip(
+                `<div>
+                     Ngày 2 #11: Cafe Hot
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_3849e74a1fa04b0e39fcb330f45df094.setIcon(div_icon_452728c5e7d7c2eeeff0bacfad8d54f7);
+            
+    
+            var marker_a01e069baa7009b78abeb811bbdb7f05 = L.marker(
+                [11.9414015, 108.4372912],
+                {
+}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            var div_icon_b1285b567adf36ef9e4ecd1e65dc4dbb = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#2980B9;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e12\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_27e1db1b25ca9cc0844dcdc0926219fc = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_8e6503c6b9c0f2f57bac0845d3e0f536 = $(`<div id="html_8e6503c6b9c0f2f57bac0845d3e0f536" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#2980B9; font-size:15px;">12. Chợ đêm</b><br>                 <span style="color:#666;">chợ quán &nbsp;|&nbsp; Ngày 2</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>18:48</b> – <b>19:33</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.2</b>                 &nbsp; 📊 Score: <b>0.3759</b><br>                 📍 Đường Nguyễn Thị Minh Khai, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@callmevyvo/video/7359542199014493448" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_27e1db1b25ca9cc0844dcdc0926219fc.setContent(html_8e6503c6b9c0f2f57bac0845d3e0f536);
+            
+        
+
+        marker_a01e069baa7009b78abeb811bbdb7f05.bindPopup(popup_27e1db1b25ca9cc0844dcdc0926219fc)
+        ;
+
+        
+    
+    
+            marker_a01e069baa7009b78abeb811bbdb7f05.bindTooltip(
+                `<div>
+                     Ngày 2 #12: Chợ đêm
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_a01e069baa7009b78abeb811bbdb7f05.setIcon(div_icon_b1285b567adf36ef9e4ecd1e65dc4dbb);
+            
+    
+            var marker_c638544863cd336f6c3745b7102eea8c = L.marker(
+                [11.9430226, 108.4368778],
+                {
+}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            var div_icon_466b3455d692884f754b0cc1de1e8cda = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#2980B9;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e13\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_94e7328a4d17e879ddce1d9820f8a57b = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_8937b1fe3f60566a644b9aad7b3f7aeb = $(`<div id="html_8937b1fe3f60566a644b9aad7b3f7aeb" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#2980B9; font-size:15px;">13. Chợ Đà Lạt</b><br>                 <span style="color:#666;">chợ quán &nbsp;|&nbsp; Ngày 2</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>19:33</b> – <b>20:18</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.5</b>                 &nbsp; 📊 Score: <b>0.2951</b><br>                 📍 chợ Đà Lạt, 24 Đường Nguyễn Thị Minh Khai, Xuân Hương - Đà Lạt, Lâm Đồng 02633, Việt Nam<br>                 <a href="https://www.tiktok.com/@ngotdichoi/video/7587357211525926164" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_94e7328a4d17e879ddce1d9820f8a57b.setContent(html_8937b1fe3f60566a644b9aad7b3f7aeb);
+            
+        
+
+        marker_c638544863cd336f6c3745b7102eea8c.bindPopup(popup_94e7328a4d17e879ddce1d9820f8a57b)
+        ;
+
+        
+    
+    
+            marker_c638544863cd336f6c3745b7102eea8c.bindTooltip(
+                `<div>
+                     Ngày 2 #13: Chợ Đà Lạt
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_c638544863cd336f6c3745b7102eea8c.setIcon(div_icon_466b3455d692884f754b0cc1de1e8cda);
+            
+    
+            var poly_line_51edfe8938aa7ad8d7d171ad9d45adc4 = L.polyline(
+                [[11.8998298, 108.4298302], [11.9018417, 108.4396697], [11.9029656, 108.447548], [11.9034324, 108.4496999], [11.953686, 108.4421459], [11.9546144, 108.4327345], [11.9391984, 108.4480242], [11.9373916, 108.4473933], [11.9409927, 108.4642694], [11.9389445, 108.4631401], [11.9443445, 108.4543587], [11.9414015, 108.4372912], [11.9430226, 108.4368778]],
+                {"bubblingMouseEvents": true, "color": "#2980B9", "dashArray": "8 4", "dashOffset": null, "fill": false, "fillColor": "#2980B9", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            poly_line_51edfe8938aa7ad8d7d171ad9d45adc4.bindTooltip(
+                `<div>
+                     Lộ trình Ngày 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            ant_path_d47ed18eaa0ac06a60de8ef9419cf908 = L.polyline.antPath(
+              [[11.8998298, 108.4298302], [11.9018417, 108.4396697], [11.9029656, 108.447548], [11.9034324, 108.4496999], [11.953686, 108.4421459], [11.9546144, 108.4327345], [11.9391984, 108.4480242], [11.9373916, 108.4473933], [11.9409927, 108.4642694], [11.9389445, 108.4631401], [11.9443445, 108.4543587], [11.9414015, 108.4372912], [11.9430226, 108.4368778]],
+              {
+  "stroke": true,
+  "color": "#2980B9",
+  "weight": 3,
+  "opacity": 0.5,
+  "lineCap": "round",
+  "lineJoin": "round",
+  "dashArray": [
+10,
+20,
+],
+  "dashOffset": null,
+  "fill": false,
+  "fillColor": "#2980B9",
+  "fillOpacity": 0.2,
+  "fillRule": "evenodd",
+  "bubblingMouseEvents": true,
+  "smoothFactor": 1.0,
+  "noClip": false,
+  "paused": false,
+  "reverse": false,
+  "hardwareAcceleration": false,
+  "delay": 800,
+  "pulseColor": "#FFFFFF",
+}
+        ).addTo(feature_group_c3b4acfdef5e71398b5baf0e307b86de);
+        
+    
+            feature_group_c3b4acfdef5e71398b5baf0e307b86de.addTo(map_8dacb85a2fb387ef773cd379340de7e0);
+        
+    
+            var feature_group_df590754fa5cc30c35438e7297a950ca = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var marker_652976d7e43c91380c54330f8019b0a7 = L.marker(
+                [11.9133535, 108.3379326],
+                {
+}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            var div_icon_4760f1782a5caf9d95b340f56f04a8a5 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#27AE60;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e1\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_4d4127d0267616fd7749b827c4555e10 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_37c933aad22d580a5d0b6687191840c6 = $(`<div id="html_37c933aad22d580a5d0b6687191840c6" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#27AE60; font-size:15px;">1. Gạch Since 1988 Cafe</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 3</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>07:00</b> – <b>08:00</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.9</b>                 &nbsp; 📊 Score: <b>0.3538</b><br>                 📍 thôn 3, Cam Ly - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@haannday/video/7631923500042800392" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_4d4127d0267616fd7749b827c4555e10.setContent(html_37c933aad22d580a5d0b6687191840c6);
+            
+        
+
+        marker_652976d7e43c91380c54330f8019b0a7.bindPopup(popup_4d4127d0267616fd7749b827c4555e10)
+        ;
+
+        
+    
+    
+            marker_652976d7e43c91380c54330f8019b0a7.bindTooltip(
+                `<div>
+                     Ngày 3 #1: Gạch Since 1988 Cafe
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_652976d7e43c91380c54330f8019b0a7.setIcon(div_icon_4760f1782a5caf9d95b340f56f04a8a5);
+            
+    
+            var marker_3f9fda4168030f2f014421b3a5dc3ac4 = L.marker(
+                [11.9157314, 108.3392217],
+                {
+}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            var div_icon_16833b75176066edce99b618a7c0b1bd = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#27AE60;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e2\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_0bedbd571e9258fd60cafbf65ed14dff = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_22fed13f9cf9df7ec1f0049bc388fcf0 = $(`<div id="html_22fed13f9cf9df7ec1f0049bc388fcf0" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#27AE60; font-size:15px;">2. Mongo land</b><br>                 <span style="color:#666;">khác &nbsp;|&nbsp; Ngày 3</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>08:00</b> – <b>08:45</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.5</b>                 &nbsp; 📊 Score: <b>0.3723</b><br>                 📍 Tổ 16 thôn 1, Tà Nung, Cam Ly - Đà Lạt, Lâm Đồng 670000, Việt Nam<br>                 <a href="https://www.tiktok.com/@two_peas_abroad/video/7549937570201816342" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_0bedbd571e9258fd60cafbf65ed14dff.setContent(html_22fed13f9cf9df7ec1f0049bc388fcf0);
+            
+        
+
+        marker_3f9fda4168030f2f014421b3a5dc3ac4.bindPopup(popup_0bedbd571e9258fd60cafbf65ed14dff)
+        ;
+
+        
+    
+    
+            marker_3f9fda4168030f2f014421b3a5dc3ac4.bindTooltip(
+                `<div>
+                     Ngày 3 #2: Mongo land
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_3f9fda4168030f2f014421b3a5dc3ac4.setIcon(div_icon_16833b75176066edce99b618a7c0b1bd);
+            
+    
+            var marker_6bc9c070c03dc0a5a13eb0ef0f0c92cf = L.marker(
+                [12.0260122, 108.3636996],
+                {
+}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            var div_icon_6c8e94498e79249c6412741a66c2aee5 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#27AE60;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e3\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_c68ca0c5f8473cde24c0b1f32b24ba9e = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_f6a3cdbffe94964f3808779af3c88952 = $(`<div id="html_f6a3cdbffe94964f3808779af3c88952" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#27AE60; font-size:15px;">3. Làng Cù Lần</b><br>                 <span style="color:#666;">thiên nhiên &nbsp;|&nbsp; Ngày 3</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>09:10</b> – <b>10:40</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.6</b>                 &nbsp; 📊 Score: <b>0.4048</b><br>                 📍 ĐT722, Lang Biang - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@bacxiuneee_/video/7605564991403560213" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_c68ca0c5f8473cde24c0b1f32b24ba9e.setContent(html_f6a3cdbffe94964f3808779af3c88952);
+            
+        
+
+        marker_6bc9c070c03dc0a5a13eb0ef0f0c92cf.bindPopup(popup_c68ca0c5f8473cde24c0b1f32b24ba9e)
+        ;
+
+        
+    
+    
+            marker_6bc9c070c03dc0a5a13eb0ef0f0c92cf.bindTooltip(
+                `<div>
+                     Ngày 3 #3: Làng Cù Lần
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_6bc9c070c03dc0a5a13eb0ef0f0c92cf.setIcon(div_icon_6c8e94498e79249c6412741a66c2aee5);
+            
+    
+            var marker_189837e9c84c3c4bd43e95dbea7d8c6e = L.marker(
+                [11.9446386, 108.4375466],
+                {
+}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            var div_icon_6c9a9e7b0b24d7cae99df4f2cb77d8d0 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#27AE60;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e4\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_47e379eefbf09761ba31acb20ef00b4a = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_f1d3d6da904b33f58da26f055d18135f = $(`<div id="html_f1d3d6da904b33f58da26f055d18135f" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#27AE60; font-size:15px;">4. Maze bar</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 3</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>11:05</b> – <b>12:05</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.6</b>                 &nbsp; 📊 Score: <b>0.3088</b><br>                 📍 57 Phan Bội Châu, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@two_peas_abroad/video/7549937570201816342" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_47e379eefbf09761ba31acb20ef00b4a.setContent(html_f1d3d6da904b33f58da26f055d18135f);
+            
+        
+
+        marker_189837e9c84c3c4bd43e95dbea7d8c6e.bindPopup(popup_47e379eefbf09761ba31acb20ef00b4a)
+        ;
+
+        
+    
+    
+            marker_189837e9c84c3c4bd43e95dbea7d8c6e.bindTooltip(
+                `<div>
+                     Ngày 3 #4: Maze bar
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_189837e9c84c3c4bd43e95dbea7d8c6e.setIcon(div_icon_6c9a9e7b0b24d7cae99df4f2cb77d8d0);
+            
+    
+            var marker_9ae46e4201c291b8eef676d046647285 = L.marker(
+                [11.9451729, 108.4349457],
+                {
+}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            var div_icon_adc1d38c23c8ebd3c460e6c5895960ba = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#27AE60;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 0.5;\n                    \"\u003e5\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_64f48ce23a1972093bcfa952918bd8d5 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_bb806791ce64b5930f570eeaa7f8a205 = $(`<div id="html_bb806791ce64b5930f570eeaa7f8a205" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#27AE60; font-size:15px;">5. Say xưa</b><br>                 <span style="color:#666;">chợ quán &nbsp;|&nbsp; Ngày 3</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>12:00</b> – <b>12:45</b>                 &nbsp; ⚠️ Ngoài giờ<br>                 ⭐ Rating: <b>4.8</b>                 &nbsp; 📊 Score: <b>0.3072</b><br>                 📍 68 Phan Đình Phùng, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@bocauzotriiudalat/video/7524263642276105479" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_64f48ce23a1972093bcfa952918bd8d5.setContent(html_bb806791ce64b5930f570eeaa7f8a205);
+            
+        
+
+        marker_9ae46e4201c291b8eef676d046647285.bindPopup(popup_64f48ce23a1972093bcfa952918bd8d5)
+        ;
+
+        
+    
+    
+            marker_9ae46e4201c291b8eef676d046647285.bindTooltip(
+                `<div>
+                     Ngày 3 #5: Say xưa
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_9ae46e4201c291b8eef676d046647285.setIcon(div_icon_adc1d38c23c8ebd3c460e6c5895960ba);
+            
+    
+            var marker_74675d82e28ea2ecc8a0b40976e4b19c = L.marker(
+                [11.9613986, 108.4429215],
+                {
+}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            var div_icon_e97ec977f216f17308f6e2038527e5b8 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#27AE60;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e6\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_789727e4b160a4e0630417701aed4cf0 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_01d48b7b2126372ce39dca946717cb7c = $(`<div id="html_01d48b7b2126372ce39dca946717cb7c" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#27AE60; font-size:15px;">6. Đôi Đũa Có Cơm Niêu</b><br>                 <span style="color:#666;">quán ăn &nbsp;|&nbsp; Ngày 3</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>12:08</b> – <b>12:53</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.8</b>                 &nbsp; 📊 Score: <b>0.32</b><br>                 📍 96 Đường Phù Đổng Thiên Vương, Lâm Viên - Đà Lạt, Lâm Đồng 67000, Việt Nam<br>                 <a href="https://www.tiktok.com/@doiduadalat/video/7503154580214091016" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_789727e4b160a4e0630417701aed4cf0.setContent(html_01d48b7b2126372ce39dca946717cb7c);
+            
+        
+
+        marker_74675d82e28ea2ecc8a0b40976e4b19c.bindPopup(popup_789727e4b160a4e0630417701aed4cf0)
+        ;
+
+        
+    
+    
+            marker_74675d82e28ea2ecc8a0b40976e4b19c.bindTooltip(
+                `<div>
+                     Ngày 3 #6: Đôi Đũa Có Cơm Niêu
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_74675d82e28ea2ecc8a0b40976e4b19c.setIcon(div_icon_e97ec977f216f17308f6e2038527e5b8);
+            
+    
+            var marker_28fa420264ef62304f51da8ab791a4e1 = L.marker(
+                [11.9778728, 108.445152],
+                {
+}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            var div_icon_924573686918cb73b814ebae195e5980 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#27AE60;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e7\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_7ca88c0c0ed2505e29c01a3742092a63 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_09e94e6ebbfb15424596289cdf6e4008 = $(`<div id="html_09e94e6ebbfb15424596289cdf6e4008" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#27AE60; font-size:15px;">7. Đồi Mộng Mơ</b><br>                 <span style="color:#666;">thiên nhiên &nbsp;|&nbsp; Ngày 3</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>12:57</b> – <b>14:27</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.3</b>                 &nbsp; 📊 Score: <b>0.3102</b><br>                 📍 Số 5 Đường Mai Anh Đào, Lâm Viên - Đà Lạt, Lâm Đồng 670000, Việt Nam<br>                 <a href="https://www.tiktok.com/@sk1p3r009/video/7497089146683542830" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_7ca88c0c0ed2505e29c01a3742092a63.setContent(html_09e94e6ebbfb15424596289cdf6e4008);
+            
+        
+
+        marker_28fa420264ef62304f51da8ab791a4e1.bindPopup(popup_7ca88c0c0ed2505e29c01a3742092a63)
+        ;
+
+        
+    
+    
+            marker_28fa420264ef62304f51da8ab791a4e1.bindTooltip(
+                `<div>
+                     Ngày 3 #7: Đồi Mộng Mơ
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_28fa420264ef62304f51da8ab791a4e1.setIcon(div_icon_924573686918cb73b814ebae195e5980);
+            
+    
+            var marker_35909f9dc30aa975aa565d40bff77213 = L.marker(
+                [11.9308749, 108.4283069],
+                {
+}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            var div_icon_24df9c3b39c53ecc9c23a670e7b54681 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#27AE60;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e8\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_d219e555a55341d65b5dc2440aedc8ce = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_8f85a04680e83c752e02ce1c3b215e35 = $(`<div id="html_8f85a04680e83c752e02ce1c3b215e35" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#27AE60; font-size:15px;">8. Quán cafe Thời Thanh Xuân</b><br>                 <span style="color:#666;">cafe &nbsp;|&nbsp; Ngày 3</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>14:38</b> – <b>15:38</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.9</b>                 &nbsp; 📊 Score: <b>0.3456</b><br>                 📍 9 Đường Triệu Việt Vương, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@traveleverywhere.vn/video/7399602885719346450" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_d219e555a55341d65b5dc2440aedc8ce.setContent(html_8f85a04680e83c752e02ce1c3b215e35);
+            
+        
+
+        marker_35909f9dc30aa975aa565d40bff77213.bindPopup(popup_d219e555a55341d65b5dc2440aedc8ce)
+        ;
+
+        
+    
+    
+            marker_35909f9dc30aa975aa565d40bff77213.bindTooltip(
+                `<div>
+                     Ngày 3 #8: Quán cafe Thời Thanh Xuân
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_35909f9dc30aa975aa565d40bff77213.setIcon(div_icon_24df9c3b39c53ecc9c23a670e7b54681);
+            
+    
+            var marker_4a39076001bc07c4681e726ebaa384d4 = L.marker(
+                [11.9341879, 108.426007],
+                {
+}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            var div_icon_e41669c2a233d389dc2874992dddccf9 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#27AE60;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e9\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_e7fe8ba0f1138e220e23fbd97791681a = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_8349ad1437aa5c13d258588d6674c2ef = $(`<div id="html_8349ad1437aa5c13d258588d6674c2ef" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#27AE60; font-size:15px;">9. Khoai Lang Nướng</b><br>                 <span style="color:#666;">chợ quán &nbsp;|&nbsp; Ngày 3</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>16:30</b> – <b>17:15</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.9</b>                 &nbsp; 📊 Score: <b>0.36</b><br>                 📍 70 Pasteur, Xuân Hương - Đà Lạt, Lâm Đồng 670000, Việt Nam<br>                 <a href="https://www.tiktok.com/@quanngondalat/video/7532857742118096148" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_e7fe8ba0f1138e220e23fbd97791681a.setContent(html_8349ad1437aa5c13d258588d6674c2ef);
+            
+        
+
+        marker_4a39076001bc07c4681e726ebaa384d4.bindPopup(popup_e7fe8ba0f1138e220e23fbd97791681a)
+        ;
+
+        
+    
+    
+            marker_4a39076001bc07c4681e726ebaa384d4.bindTooltip(
+                `<div>
+                     Ngày 3 #9: Khoai Lang Nướng
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_4a39076001bc07c4681e726ebaa384d4.setIcon(div_icon_e41669c2a233d389dc2874992dddccf9);
+            
+    
+            var marker_7ababa55e194c5ee99b7dd3137fb3648 = L.marker(
+                [11.9218202, 108.4404024],
+                {
+}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            var div_icon_fc1de32ea97821e5d9e07ab0d11c370f = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#27AE60;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e10\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_f3eeda40e0a2883cadd57f108565088a = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_18978c773488e1d92be1a3c1f1746bfd = $(`<div id="html_18978c773488e1d92be1a3c1f1746bfd" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#27AE60; font-size:15px;">10. Mộc Quán BBQ</b><br>                 <span style="color:#666;">chợ quán &nbsp;|&nbsp; Ngày 3</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>17:19</b> – <b>18:04</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.8</b>                 &nbsp; 📊 Score: <b>0.3012</b><br>                 📍 Hẻm 59 Đường Đống Đa, Xuân Hương - Đà Lạt, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@tungnuitravel/video/7445286601103510801" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_f3eeda40e0a2883cadd57f108565088a.setContent(html_18978c773488e1d92be1a3c1f1746bfd);
+            
+        
+
+        marker_7ababa55e194c5ee99b7dd3137fb3648.bindPopup(popup_f3eeda40e0a2883cadd57f108565088a)
+        ;
+
+        
+    
+    
+            marker_7ababa55e194c5ee99b7dd3137fb3648.bindTooltip(
+                `<div>
+                     Ngày 3 #10: Mộc Quán BBQ
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_7ababa55e194c5ee99b7dd3137fb3648.setIcon(div_icon_fc1de32ea97821e5d9e07ab0d11c370f);
+            
+    
+            var marker_2b147ca32a20391dfd9a43efe683b0b5 = L.marker(
+                [11.9236382, 108.4445164],
+                {
+}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            var div_icon_19561f02ab111583e3c2c719a62cd231 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#27AE60;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e11\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_1eeb531ad23fdc749199fdc1f054d9d6 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_547f86efb9721a32409cf5b7612d0609 = $(`<div id="html_547f86efb9721a32409cf5b7612d0609" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#27AE60; font-size:15px;">11. Tiệm nướng trong rừng @Miền Du Mục</b><br>                 <span style="color:#666;">chợ quán &nbsp;|&nbsp; Ngày 3</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>18:05</b> – <b>18:50</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.5</b>                 &nbsp; 📊 Score: <b>0.3267</b><br>                 📍 3 bis Đống Đa, Xuân Hương - Đà Lạt, Lâm Đồng 670000, Việt Nam<br>                 <a href="https://www.tiktok.com/@dieuhoang211/video/7523798698493545735" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_1eeb531ad23fdc749199fdc1f054d9d6.setContent(html_547f86efb9721a32409cf5b7612d0609);
+            
+        
+
+        marker_2b147ca32a20391dfd9a43efe683b0b5.bindPopup(popup_1eeb531ad23fdc749199fdc1f054d9d6)
+        ;
+
+        
+    
+    
+            marker_2b147ca32a20391dfd9a43efe683b0b5.bindTooltip(
+                `<div>
+                     Ngày 3 #11: Tiệm nướng trong rừng @Miền Du Mục
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_2b147ca32a20391dfd9a43efe683b0b5.setIcon(div_icon_19561f02ab111583e3c2c719a62cd231);
+            
+    
+            var marker_49b5adfe2bf9d4981a48b6f8d9e3cfe9 = L.marker(
+                [11.9719841, 108.4514667],
+                {
+}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            var div_icon_9642ba0c282815538d8c112263dff4d2 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#27AE60;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 1.0;\n                    \"\u003e12\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_081e5451662504a841aa660bc1317713 = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_016e7d39760e8c79562c3e53dce6de8c = $(`<div id="html_016e7d39760e8c79562c3e53dce6de8c" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#27AE60; font-size:15px;">12. Hoàng Hôn</b><br>                 <span style="color:#666;">địa điểm checkin &nbsp;|&nbsp; Ngày 3</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>19:01</b> – <b>19:31</b>                 &nbsp; ✅<br>                 ⭐ Rating: <b>4.9</b>                 &nbsp; 📊 Score: <b>0.3187</b><br>                 📍 37 Đường Trần Đại Nghĩa, Lâm Viên - Đà Lạt, Lâm Đồng 67000, Việt Nam<br>                 <a href="https://www.tiktok.com/@hachireview74/video/7460073643004022034" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_081e5451662504a841aa660bc1317713.setContent(html_016e7d39760e8c79562c3e53dce6de8c);
+            
+        
+
+        marker_49b5adfe2bf9d4981a48b6f8d9e3cfe9.bindPopup(popup_081e5451662504a841aa660bc1317713)
+        ;
+
+        
+    
+    
+            marker_49b5adfe2bf9d4981a48b6f8d9e3cfe9.bindTooltip(
+                `<div>
+                     Ngày 3 #12: Hoàng Hôn
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_49b5adfe2bf9d4981a48b6f8d9e3cfe9.setIcon(div_icon_9642ba0c282815538d8c112263dff4d2);
+            
+    
+            var marker_0981ed1033c8a62a44c110b3b4dd685f = L.marker(
+                [12.1120052, 108.5861358],
+                {
+}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            var div_icon_638ee855fd825969766b2e979e1e5add = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#27AE60;\n                        color:white;\n                        border-radius:50%;\n                        width:28px; height:28px;\n                        display:flex; align-items:center; justify-content:center;\n                        font-weight:bold; font-size:12px;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);\n                        opacity: 0.5;\n                    \"\u003e13\u003c/div\u003e\n                    ",
+  "iconSize": [28, 28],
+  "iconAnchor": [14, 14],
+  "className": "empty",
+});
+        
+    
+        var popup_a45da36d200028b49e0bc86b3f40be1c = L.popup({
+  "maxWidth": 280,
+});
+
+        
+            
+                var html_737636acd16ccd0191e5d64832e48cd0 = $(`<div id="html_737636acd16ccd0191e5d64832e48cd0" style="width: 100.0%; height: 100.0%;">             <div style="font-family:Arial; min-width:220px; font-size:13px;">                 <b style="color:#27AE60; font-size:15px;">13. Vườn thú Zoodoo</b><br>                 <span style="color:#666;">thiên nhiên &nbsp;|&nbsp; Ngày 3</span><br>                 <hr style="margin:5px 0;">                 🕐 <b>20:13</b> – <b>21:43</b>                 &nbsp; ⚠️ Ngoài giờ<br>                 ⭐ Rating: <b>4.5</b>                 &nbsp; 📊 Score: <b>0.3711</b><br>                 📍 QL27C, Lạc Dương, Lâm Đồng, Việt Nam<br>                 <a href="https://www.tiktok.com/@grinlai/video/7636632967338560775" target="_blank">🎬 Xem TikTok</a>             </div>             </div>`)[0];
+                popup_a45da36d200028b49e0bc86b3f40be1c.setContent(html_737636acd16ccd0191e5d64832e48cd0);
+            
+        
+
+        marker_0981ed1033c8a62a44c110b3b4dd685f.bindPopup(popup_a45da36d200028b49e0bc86b3f40be1c)
+        ;
+
+        
+    
+    
+            marker_0981ed1033c8a62a44c110b3b4dd685f.bindTooltip(
+                `<div>
+                     Ngày 3 #13: Vườn thú Zoodoo
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_0981ed1033c8a62a44c110b3b4dd685f.setIcon(div_icon_638ee855fd825969766b2e979e1e5add);
+            
+    
+            var poly_line_ef77c49ed34a5bfd25d15fcffab3ec6b = L.polyline(
+                [[11.9133535, 108.3379326], [11.9157314, 108.3392217], [12.0260122, 108.3636996], [11.9446386, 108.4375466], [11.9451729, 108.4349457], [11.9613986, 108.4429215], [11.9778728, 108.445152], [11.9308749, 108.4283069], [11.9341879, 108.426007], [11.9218202, 108.4404024], [11.9236382, 108.4445164], [11.9719841, 108.4514667], [12.1120052, 108.5861358]],
+                {"bubblingMouseEvents": true, "color": "#27AE60", "dashArray": "8 4", "dashOffset": null, "fill": false, "fillColor": "#27AE60", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            poly_line_ef77c49ed34a5bfd25d15fcffab3ec6b.bindTooltip(
+                `<div>
+                     Lộ trình Ngày 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            ant_path_09f71abd5336a7ae31b5d88fee3cac5e = L.polyline.antPath(
+              [[11.9133535, 108.3379326], [11.9157314, 108.3392217], [12.0260122, 108.3636996], [11.9446386, 108.4375466], [11.9451729, 108.4349457], [11.9613986, 108.4429215], [11.9778728, 108.445152], [11.9308749, 108.4283069], [11.9341879, 108.426007], [11.9218202, 108.4404024], [11.9236382, 108.4445164], [11.9719841, 108.4514667], [12.1120052, 108.5861358]],
+              {
+  "stroke": true,
+  "color": "#27AE60",
+  "weight": 3,
+  "opacity": 0.5,
+  "lineCap": "round",
+  "lineJoin": "round",
+  "dashArray": [
+10,
+20,
+],
+  "dashOffset": null,
+  "fill": false,
+  "fillColor": "#27AE60",
+  "fillOpacity": 0.2,
+  "fillRule": "evenodd",
+  "bubblingMouseEvents": true,
+  "smoothFactor": 1.0,
+  "noClip": false,
+  "paused": false,
+  "reverse": false,
+  "hardwareAcceleration": false,
+  "delay": 800,
+  "pulseColor": "#FFFFFF",
+}
+        ).addTo(feature_group_df590754fa5cc30c35438e7297a950ca);
+        
+    
+            feature_group_df590754fa5cc30c35438e7297a950ca.addTo(map_8dacb85a2fb387ef773cd379340de7e0);
+        
+    
+            var layer_control_ad5f7472c0851562914c2b8e4dad4364_layers = {
+                base_layers : {
+                    "cartodbpositron" : tile_layer_a3fa696a1bbad1e2cc7a2da62882130b,
+                },
+                overlays :  {
+                    "\ud83d\udcc5 Ng\u00e0y 1" : feature_group_1d1ea0c9ff40592b26cb8acd86a4f843,
+                    "\ud83d\udcc5 Ng\u00e0y 2" : feature_group_c3b4acfdef5e71398b5baf0e307b86de,
+                    "\ud83d\udcc5 Ng\u00e0y 3" : feature_group_df590754fa5cc30c35438e7297a950ca,
+                },
+            };
+            let layer_control_ad5f7472c0851562914c2b8e4dad4364 = L.control.layers(
+                layer_control_ad5f7472c0851562914c2b8e4dad4364_layers.base_layers,
+                layer_control_ad5f7472c0851562914c2b8e4dad4364_layers.overlays,
+                {
+  "position": "topright",
+  "collapsed": false,
+  "autoZIndex": true,
+}
+            ).addTo(map_8dacb85a2fb387ef773cd379340de7e0);
+
+        
+</script>
+</html>
