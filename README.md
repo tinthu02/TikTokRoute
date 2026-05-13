@@ -8,7 +8,7 @@ GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 
 
 ### Các bước thực hiện
-1. Tạo fil `.env`.
+1. Tạo file `.env`.
 2. Điền API key của riêng bạn vào các biến tương ứng.
 3. Lưu file và chạy project.
 
