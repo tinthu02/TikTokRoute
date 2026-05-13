@@ -163,9 +163,15 @@ def simulate_day(poi_list, user_start, user_end):
     return total_km, feasible, sorted(timeline, key=lambda x: x["start"])
 
 def split_days(route, num_days):
-    n=len(route); days=[]; size=n//num_days; rem=n%num_days; idx=0
+    """
+    Chia route thành num_days ngày theo clustering địa lý.
+    Sort theo latitude để các điểm cùng ngày gần nhau về địa lý,
+    tránh tình trạng ngày 1 toàn điểm phía bắc, ngày 2 toàn phía nam.
+    """
+    sorted_route = sorted(route, key=lambda p: p["lat"])
+    n=len(sorted_route); days=[]; size=n//num_days; rem=n%num_days; idx=0
     for d in range(num_days):
-        end=idx+size+(1 if d<rem else 0); days.append(route[idx:end]); idx=end
+        end=idx+size+(1 if d<rem else 0); days.append(sorted_route[idx:end]); idx=end
     return days
 
 def route_cost(route, num_days, user_start, user_end):
@@ -204,8 +210,20 @@ def simulated_annealing(initial, num_days, user_start, user_end,
     best_cost=cur_cost; T=T0
     for _ in range(max_iter):
         if T<0.01: break
-        n=len(current); i,j=random.sample(range(n),2)
-        nb=list(current); nb[i],nb[j]=nb[j],nb[i]
+        n=len(current)
+        nb=list(current)
+        op=random.randint(0,2)
+
+        if op==0:                        # swap
+            i,j=random.sample(range(n),2)
+            nb[i],nb[j]=nb[j],nb[i]
+        elif op==1:                      # 2-opt: reverse segment [i..j]
+            i,j=sorted(random.sample(range(n),2))
+            nb[i:j+1]=nb[i:j+1][::-1]
+        else:                            # or-opt: move one element
+            i=random.randrange(n); j=random.randrange(n-1)
+            if j>=i: j+=1
+            poi=nb.pop(i); nb.insert(j,poi)
         nc=route_cost(nb,num_days,user_start,user_end)
         delta=nc-cur_cost
         if delta<0 or random.random()<math.exp(-delta/T):
