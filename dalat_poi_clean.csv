@@ -1,5 +1,5 @@
 ﻿place_name,type,mention_count,total_digg,total_plays,max_followers,price_mentions,video_urls,confidence_high,popularity_score,aliases
-Sân Mây Đà Lạt,cafe,29,923127,21568292,789800,199k/ng | 50xu,https://www.tiktok.com/@review.lt7/video/7603371406423887125,23,3369.96,Săn Mây Đà Lạt
+Sân Mây Đà Lạt,cafe,29,923127,21568292,789800,50xu | 199k/ng,https://www.tiktok.com/@review.lt7/video/7603371406423887125,23,3369.96,Săn Mây Đà Lạt
 Suối Bình Yên,thiên nhiên,3,318000,9785200,758200,,https://www.tiktok.com/@dieuhoang211/video/7523798698493545735,3,1326.52,Cơm Lam Gà Nướng (Suối Bình Yên)
 Café Mây,cafe,6,228304,7522155,51900,,https://www.tiktok.com/@spotly.asia/video/7254176332165287170,5,1040.52,Cà phê Đà Lạt | Cafe Sân Mây | Cà phê mây Đà Lạt | Cafe treo trên sườn đồi
 Quán Cà Phê Mây,cafe,8,103679,5272161,252100,,https://www.tiktok.com/@dao_duy_phuong/video/7590979517661940999,5,710.9,
@@ -7,12 +7,13 @@ Happy Hill,địa điểm checkin,2,140300,5400000,1300000,,https://www.tiktok.c
 Lang Ben Pho Homestay,homestay,1,128000,5400000,35000,,https://www.tiktok.com/@langbenphohomestay/video/7550132232485195015,1,678.0,
 Miền Du Mục,cafe,3,326735,2217100,146700,"100,000 VND ($3.80)",https://www.tiktok.com/@ericgoesto/video/7523077765306895646,3,578.45,
 Bánh Tráng Nướng Đà Lạt,chợ quán,4,169064,3083500,87800,,https://www.tiktok.com/@nhienthichan/video/7042878105987468546,2,517.41,
-Datanla,chợ quán,12,93415,2912168,229100,,https://www.tiktok.com/@huevui98/video/7597422283459792136,12,504.63,Cà Tám Đà Lạt | Datanla Falls | Datanla Adventure Activities | Datanla Waterfall | Datanla New Alpine Coaster
 Dom Dom House Dalat,homestay,1,68600,4100000,19500,,https://www.tiktok.com/@domdomhousedalat/video/7502706387995102485,1,488.6,
 Nha Ben Rung,cafe,1,258700,1600000,216100,,https://www.tiktok.com/@tiemcaphenhabenrung/video/7493504577296223496,1,428.7,
+Thác Datanla,thiên nhiên,14,31972,1803476,789800,170k 1 người,https://www.tiktok.com/@tinhdidaydido.travelvlog/video/7602245369891704084,14,352.32,
 Cơm niêu,chợ quán,1,70100,2700000,9135,59K,https://www.tiktok.com/@tiemcomnieunhala/video/7344170952231570708,1,350.1,
 Tiệm cà phê Miền Du Mục,cafe,2,92400,2307600,146700,,https://www.tiktok.com/@tiktokgapgiquaydo/video/7571609207460482322,1,343.16,Miendumuc
 Quán cafe Đà Lạt,cafe,1,91400,2400000,789700,,https://www.tiktok.com/@nhandian/video/7164729843039472922,0,341.4,
+Datanla,chợ quán,7,77099,1941240,229100,,https://www.tiktok.com/@huevui98/video/7597422283459792136,7,341.22,Datanla Falls | Datanla New Alpine Coaster | Datanla Adventure Activities | Datanla Waterfall | Cà Tám Đà Lạt
 Cau Gò Binh Minh,thiên nhiên,1,64400,2600000,33100,,https://www.tiktok.com/@sanmaycaugo_binhminh/video/7509742123164470546,1,334.4,
 Happy Hill Đà Lạt,địa điểm checkin,9,55690,1745287,1300000,,https://www.tiktok.com/@happyhill.dalat/video/7638534135786654997,9,320.22,
 Thác Đá An Lạc,thiên nhiên,1,91100,2000000,3811,,https://www.tiktok.com/@empekhavy/video/7614415503121075463,1,301.1,
@@ -26,6 +27,7 @@ Lạc Hư Cổ Trấn,khách sạn,1,40700,1800000,123200,,https://www.tiktok.co
 Mai Anh Đào,thiên nhiên,1,49800,1700000,10300,,https://www.tiktok.com/@.lt.3605/video/7601868238388989191,1,229.8,
 Dream Garden Homestay,homestay,1,130900,854600,26000,,https://www.tiktok.com/@dreamgardenhomestay/video/7465903140534013185,1,226.36,
 Chân gà quái thú Đà Lạt,chợ quán,1,56800,1500000,71300,,https://www.tiktok.com/@sieuanvat25/video/7239287781401398533,1,216.8,
+Lang Biang,thiên nhiên,7,16943,1285336,48700,,https://www.tiktok.com/@_jingbo_/video/7474884678378343687,6,215.48,Lang Biang Land
 Om Secret Hill Đà Lạt,homestay,1,41800,1600000,5782,,https://www.tiktok.com/@aihaohaohao/video/7565083466304408839,1,211.8,
 Cà phê Bản Lèo,cafe,4,44027,1235200,568600,,https://www.tiktok.com/@suoibinhyen/video/7596534131127749909,4,207.55,Bản Lèo
 Cau Go San May,thiên nhiên,1,63500,1300000,240500,,https://www.tiktok.com/@tiemanhbaprangbo/video/7336046705617440007,1,203.5,
@@ -33,14 +35,12 @@ Cầu Treo Đa Nhim,địa điểm checkin,1,48800,1400000,5224,,https://www.tik
 The Florest,địa điểm checkin,1,57000,1300000,81400,,https://www.tiktok.com/@theflorestdalat/video/7598936749192023317,1,197.0,
 Quán cafe ngắm hoàng hôn,cafe,1,26300,1600000,222100,,https://www.tiktok.com/@dichoimoingay/video/7358722304156683527,1,196.3,
 Hồ Xuân Hương,thiên nhiên,1,34100,1500000,222100,,https://www.tiktok.com/@dichoimoingay/video/7474114773529939220,0,194.1,
-Thác Datanla,thiên nhiên,9,15656,832548,789800,170k 1 người,https://www.tiktok.com/@tinhdidaydido.travelvlog/video/7602245369891704084,9,188.91,
 Langbiang Land,thiên nhiên,2,21127,1300407,16200,,https://www.tiktok.com/@langbiangland/video/7528369502120185095,2,171.17,
 tiệm trà mới mở,cafe,2,56900,925700,14700,,https://www.tiktok.com/@thaodimuonnoi/video/7634755846488050964,0,169.47,
 Quán ăn khuya Phung Lai,chợ quán,1,58200,959900,3600000,,https://www.tiktok.com/@phunglai2222/video/7514281689141546248,0,164.19,
 Quán cafe tone đen xịn nhất ở Đà Lạt,cafe,1,31700,1200000,222100,,https://www.tiktok.com/@dichoimoingay/video/7360554249291353352,0,161.7,
 Sola Cafe Dalat,cafe,1,38200,1100000,60300,,https://www.tiktok.com/@chulamreview/video/7634093050142149895,0,158.2,
 Floating TOWN,cafe,1,26300,1200000,60300,,https://www.tiktok.com/@chulamreview/video/7596659252794723592,1,156.3,
-Lang Biang Land,thiên nhiên,2,14945,1201069,16200,,https://www.tiktok.com/@_jingbo_/video/7474884678378343687,1,155.05,
 Thác Mây,thiên nhiên,1,22900,1100000,26700,,https://www.tiktok.com/@thacmay/video/7550279164360690962,1,142.9,
 Rừng Na Uy,thiên nhiên,2,33297,862000,8893,,https://www.tiktok.com/@quanhchilllamm/video/7593951981899631880,2,139.5,Rừng Giao Hưởng
 Quán cafe tựa bước ra từ cổ tích,cafe,1,17600,1100000,214600,,https://www.tiktok.com/@hifasne/video/7475687967948967176,1,137.6,
@@ -101,11 +101,9 @@ REO Campsite,địa điểm checkin,1,13900,400100,102900,,https://www.tiktok.co
 3 Quán Cafe View Siêu Đỉnh,địa điểm checkin,1,4056,479000,263300,,https://www.tiktok.com/@ghiendalat_official/video/7260308599430204673,0,61.96,
 155ca,cafe,1,17900,338900,1591,,https://www.tiktok.com/@vuongtong_1/video/7634451004020444423,1,61.79,
 Tiệm cơm phần siêu ngon,khác,1,8410,423600,207700,hơi bị rẻ,https://www.tiktok.com/@didalatcungtruc/video/7104962108843887899,1,60.77,
-Lang Biang,thiên nhiên,5,1998,84267,48700,,https://www.tiktok.com/@quynnchiiuu/video/7636719449567005959,5,60.42,
 Hoàng Hôn,địa điểm checkin,1,18300,319900,424400,,https://www.tiktok.com/@hachireview74/video/7460073643004022034,0,60.29,
 Trúc Trực Wolf House,homestay,1,6010,440900,34500,,https://www.tiktok.com/@tructruc.wolfhouse/video/7524347222104804615,1,60.1,
 Quán lẩu cá tầm,chợ quán,1,7435,426200,789800,,https://www.tiktok.com/@nhandian/video/7580740804403039496,0,60.06,
-Xứ Sở Cổng Trời,địa điểm checkin,2,3546,340500,1029,,https://www.tiktok.com/@chu3thun/video/7618431180450336008,1,57.6,chỗ chụp hình
 Cà phê Happy Hill,cafe,1,10300,364300,176200,,https://www.tiktok.com/@hongphuonghoteldalat42/video/7588448993714228481,1,56.73,
 Mien Du Muc coffee,cafe,1,9965,365600,44400,,https://www.tiktok.com/@vietnammoment.official/video/7583993449930624276,1,56.53,
 Da Lat Night Market,chợ quán,1,15300,308000,635900,,https://www.tiktok.com/@nama.bites/video/7190212898000571653,1,56.1,
@@ -116,7 +114,7 @@ Homestay Tranoi,homestay,1,4960,370600,74200,,https://www.tiktok.com/@ngoctran95
 Quán cafe HabaNuru,cafe,1,4960,370600,74200,,https://www.tiktok.com/@ngoctran95_03/video/7349139757395479815,0,52.02,
 Quán Cơm Trưa Với Các Món Ăn Đặc Sản Của Người Đồng Bào,chợ quán,1,6023,354500,242400,bình dân,https://www.tiktok.com/@du_lich_dalat/video/7514631840213454088,1,51.47,
 Oday Co Homexinh,homestay,1,6386,341800,71800,,https://www.tiktok.com/@odaycohomexinh/video/7593300052982926612,1,50.57,
-Cơm Tấm,chợ quán,2,6948,234800,242400,ngon rẻ,https://www.tiktok.com/@xalachtrondaugiam/video/7562106189757156616,1,50.43,Cơm Tấm Utle | Cơm Tấm Ngon Rẻ
+Cơm Tấm,chợ quán,2,6948,234800,242400,ngon rẻ,https://www.tiktok.com/@xalachtrondaugiam/video/7562106189757156616,1,50.43,Cơm Tấm Ngon Rẻ | Cơm Tấm Utle
 Quán Cơm Linh,chợ quán,1,13700,265000,12300,,https://www.tiktok.com/@quancomlinhdalat/video/7575476880564817159,1,50.2,
 Xưởng Kem Hoa,cafe,1,7810,323100,1332,,https://www.tiktok.com/@checkindalat24h/video/7579053153572736263,1,50.12,
 Happy Hill Coffee,cafe,2,6213,223000,1288,,https://www.tiktok.com/@happyhill...dalat/video/7637101558462991624,2,48.51,
@@ -155,6 +153,7 @@ Oday Coffee Home,homestay,1,6025,166500,71800,,https://www.tiktok.com/@odaycohom
 Quán cà phê Cô Long,cafe,1,5566,170500,2406,,https://www.tiktok.com/@dalatlamdongvn/video/7630797274771180817,1,32.62,
 Làng Cù Lần,thiên nhiên,1,3497,191100,57200,,https://www.tiktok.com/@bacxiuneee_/video/7605564991403560213,1,32.61,
 Mộc Quán BBQ,chợ quán,1,1404,202100,71900,,https://www.tiktok.com/@tungnuitravel/video/7445286601103510801,0,31.61,
+chỗ chụp hình,địa điểm checkin,1,1659,197900,1029,,https://www.tiktok.com/@chu3thun/video/7618431180450336008,0,31.45,
 Thác Pongour,thiên nhiên,3,163,8773,4447,,https://www.tiktok.com/@thanhlanbt88/video/7635497474953596167,3,31.04,
 Thác May,thiên nhiên,2,1339,93837,2300,,https://www.tiktok.com/@thacmaydalat/video/7634170169182424340,2,30.72,
 Rừng Lá Kim Cafe,cafe,1,3076,176400,200300,,https://www.tiktok.com/@tuthoreview/video/7403709530078579976,1,30.72,
@@ -173,6 +172,7 @@ Quán cơm số 7,chợ quán,1,2196,151600,43800,,https://www.tiktok.com/@tanoh
 Khu tổ hợp trò chơi giải trí,địa điểm checkin,1,1275,158100,49400,,https://www.tiktok.com/@toiudl/video/7475537134867238151,1,27.09,
 Tiệm nướng mùa thu Đà Lạt,khác,1,3864,132100,482300,,https://www.tiktok.com/@ngocduy_diachianuong/video/7607637946195283220,1,27.07,
 Delight Park Đà Lạt,địa điểm checkin,1,2444,144300,111100,,https://www.tiktok.com/@nhanphepha/video/7610772204464164117,1,26.87,
+Xứ Sở Cổng Trời,thiên nhiên,1,1887,142600,297,,https://www.tiktok.com/@xusocongtroi/video/7528426729644248337,1,26.15,
 Quán lẩu nướng Cô Xuân,chợ quán,1,2311,137100,315100,,https://www.tiktok.com/@bananzidong/video/7490785825370688776,1,26.02,
 Tiệm ăn vặt ngon ở Đà Lạt,chợ quán,1,3921,119600,207700,,https://www.tiktok.com/@didalatcungtruc/video/7457163819102637320,0,25.88,
 Khách sạn đẹp trung tâm Đà Lạt,khách sạn,1,1607,141200,10900,,https://www.tiktok.com/@combo.ngavivu/video/7552718308580019477,0,25.73,
@@ -202,7 +202,6 @@ Nhà Của Thông,địa điểm checkin,1,1656,100600,25300,,https://www.tiktok
 Cafe Chill,cafe,1,1087,105600,123200,,https://www.tiktok.com/@tiktokgapgiquaydo/video/7492225663596760328,0,21.65,
 Tiệm cf Nàng Dalat,cafe,1,1575,97000,23900,,https://www.tiktok.com/@tiemcafenangdalat/video/7418937812419988743,1,21.27,
 Dalat's Cafe,cafe,2,427,7206,3272,,https://www.tiktok.com/@lou502city/video/7625401545194065183,1,21.15,
-Catam,cafe,2,354,6307,32400,,https://www.tiktok.com/@chuyenlaca_/video/7564389953900170503,2,20.98,Chợ LightGem
 Thác Lien Khuong,thiên nhiên,1,1094,97800,8227,,https://www.tiktok.com/@dalatcungtico/video/7234122283558767877,1,20.87,
 Chợ Đà Lạt,chợ quán,1,1967,88800,250,siêu rẻ HSSV,https://www.tiktok.com/@ngotdichoi/video/7587357211525926164,1,20.85,
 Cafe Toi Den,cafe,2,347,4831,4952,,https://www.tiktok.com/@diemthuynguyen_1979/video/7450640480565464338,2,20.83,Caffe Vườn Địa Đàng
@@ -328,6 +327,7 @@ Moidalat,cafe,1,130,6665,184,baotienmotmobinhyen,https://www.tiktok.com/@capheda
 Tiệm cà phê Custty - Coffee & More Đà Lạt,cafe,1,58,7331,184,,https://www.tiktok.com/@caphedalat01/video/7450131900565327111,1,10.79,
 WAKEN BEANS COFFEE,cafe,1,193,5662,207,,https://www.tiktok.com/@dky.zzz0/video/7637853189676584212,1,10.76,
 Guama Homestay,homestay,1,63,5933,69600,1tr1/ đêm,https://www.tiktok.com/@nguamodalat/video/7638250028758453524,1,10.66,
+Catam,cafe,1,278,3673,32400,,https://www.tiktok.com/@chuyenlaca_/video/7564389953900170503,1,10.65,
 Nơi nào cafe đẹp,cafe,1,36,6144,1568,,https://www.tiktok.com/@gotaditravel/video/7615478825572388117,0,10.65,
 Café sáng sớm Đà Lạt,cafe,1,36,6144,1568,,https://www.tiktok.com/@gotaditravel/video/7615478825572388117,0,10.65,
 Đèo SaCom,thiên nhiên,1,87,5334,26400,,https://www.tiktok.com/@giaygiaydalat/video/7638543354824854791,1,10.62,
@@ -344,6 +344,7 @@ Tiem cafe thang bay,cafe,1,63,3661,5567,,https://www.tiktok.com/@thanhluan.1010/
 Đồi Mộng Mơ,thiên nhiên,1,189,2312,1339,,https://www.tiktok.com/@sk1p3r009/video/7497089146683542830,1,10.42,
 Quán cà phê Đà Lạt,cafe,1,73,2936,117,,https://www.tiktok.com/@littletown.dalat/video/7634114282900196626,0,10.37,
 Hoa Ven Rừng,địa điểm checkin,1,104,2500,816,,https://www.tiktok.com/@tiemangiadinhhoavenrung/video/7521937649511238920,1,10.35,
+Chợ LightGem,chợ quán,1,76,2634,3440,,https://www.tiktok.com/@thaodiuu/video/7636721569640877319,1,10.34,
 Datanla Đà Lạt,thiên nhiên,1,11,3141,14600,,https://www.tiktok.com/@wikidulich.com/video/7577590169797152018,1,10.33,
 Hòn Bồ,thiên nhiên,1,59,2682,3828,,https://www.tiktok.com/@dalatchillmap/video/7561792004250815764,1,10.33,
 Cafe Miền Du,cafe,1,247,761,2718,,https://www.tiktok.com/@chau.giang.dng/video/7632565519182236936,1,10.32,Café Miền Du

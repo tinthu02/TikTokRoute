@@ -277,6 +277,32 @@ def main():
     print("\n[2/4] Tính attraction score...")
     scored = compute_final_scores(pois)
 
+    # ── ABLATION TEST trọng số ──────────────────────────────────
+    print("\n[2b/4] Ablation test 3 cấu hình trọng số:")
+    weight_configs = [
+        (0.3, 0.7, "GMaps-heavy"),
+        (0.5, 0.5, "Balanced"),
+        (0.6, 0.4, "TikTok-heavy (current)"),
+    ]
+    for wt, wg, label in weight_configs:
+        # Tạm thời override weights để tính
+        tiktok_raws = [compute_tiktok_raw(p) for p in pois]
+        gmaps_raws  = [compute_gmaps_raw(p)  for p in pois]
+        tn = normalize_minmax(tiktok_raws)
+        gn = normalize_minmax(gmaps_raws)
+        test_scores = []
+        for i, p in enumerate(pois):
+            if safe_float(p.get("gmaps_rating", 0)) == 0:
+                s = tn[i]
+            else:
+                s = wt * tn[i] + wg * gn[i]
+            test_scores.append((p["place_name"], round(s, 4)))
+        test_scores.sort(key=lambda x: -x[1])
+        top5 = ", ".join(f"{n[:20]}({s})" for n, s in test_scores[:5])
+        print(f"    [{label:<25}] Top-5: {top5}")
+    print()
+    # ────────────────────────────────────────────────────────────
+
     # Lọc POI đưa vào route
     route_pois = [p for p in scored if p["include_in_route"]]
     print(f"  POI đưa vào route: {len(route_pois)}/{len(scored)}")

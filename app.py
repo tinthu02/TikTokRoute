@@ -74,6 +74,36 @@ def fmt(minutes):
     h=int(minutes)//60%24; m=int(minutes)%60
     return f"{h:02d}:{m:02d}"
 
+# ── Visit Duration Inference ──────────────────────────────────
+_BASE_DURATION = {
+    "cafe": 55, "nhà hàng": 65, "chợ quán": 40,
+    "địa điểm checkin": 25, "thiên nhiên": 85, "quán ăn": 50, "khác": 40,
+}
+_PRICE_ADJUST = {0: -5, 1: 0, 2: 5, 3: 15, 4: 20}
+
+def infer_visit_duration(poi_type, price_level, reviews_count, csv_value):
+    csv_int = safe_int(csv_value, 0)
+    if csv_int > 0 and csv_int != 45:
+        return csv_int
+    base = _BASE_DURATION.get(poi_type.strip().lower(), 40)
+    base += _PRICE_ADJUST.get(safe_int(price_level, 1), 0)
+    reviews = safe_int(reviews_count, 0)
+    if reviews > 5000:   base += 15
+    elif reviews > 1000: base += 8
+    elif reviews > 500:  base += 3
+    elif reviews < 50:   base -= 5
+    return max(15, base)
+
+# Giờ mở cửa mặc định theo loại POI
+_DEFAULT_HOURS = {
+    "thiên nhiên":      (7*60, 18*60),
+    "địa điểm checkin": (6*60, 20*60),
+    "cafe":             (7*60, 22*60),
+    "nhà hàng":         (10*60, 22*60),
+    "chợ quán":         (6*60, 22*60),
+    "khác":             (7*60, 21*60),
+}
+
 # ══════════════════════════════════════════════════════════════
 # LOAD POI
 # ══════════════════════════════════════════════════════════════
@@ -101,19 +131,21 @@ def load_pois():
         if coord_key in seen: continue
         seen.add(coord_key)
 
-        open_min  = safe_float(r.get("open_min"))
-        close_min = safe_float(r.get("close_min"))
-        if open_min==0 and str(r.get("close_min","")) in ("","nan","None"):
+        open_min_raw  = r.get("open_min", "")
+        close_min_raw = r.get("close_min", "")
+        open_min  = safe_float(open_min_raw)  if open_min_raw  not in ("","nan","None") else 0
+        close_min = safe_float(close_min_raw) if close_min_raw not in ("","nan","None") else 24*60
+        if close_min_raw not in ("","nan","None") and close_min == 0 and open_min > 0:
             close_min = 24*60
-        if close_min==0 and open_min>0:
-            close_min = 22*60
 
+        # Default hours theo loại POI nếu không có giờ thực tế
         poi_type = r.get("type","khác").strip().lower()
-        # Normalize type
         for k in TYPE_VI:
-            if k in poi_type:
-                poi_type = k
-                break
+            if k in poi_type: poi_type = k; break
+        if open_min_raw in ("","nan","None") or close_min_raw in ("","nan","None"):
+            def_open, def_close = _DEFAULT_HOURS.get(poi_type, (7*60, 21*60))
+            if open_min_raw  in ("","nan","None"): open_min  = def_open
+            if close_min_raw in ("","nan","None"): close_min = def_close
 
         pois.append({
             "name":       r["place_name"],
@@ -124,11 +156,17 @@ def load_pois():
             "reviews":    safe_int(r.get("gmaps_reviews_count")),
             "open_min":   open_min,
             "close_min":  close_min,
-            "visit_min":  safe_int(r.get("visit_duration_min",45)),
+            "visit_min":  infer_visit_duration(
+                              poi_type,
+                              r.get("gmaps_price_level",""),
+                              r.get("gmaps_reviews_count",""),
+                              r.get("visit_duration_min", 45),
+                          ),
             "address":    r.get("gmaps_address",""),
             "video_url":  r.get("video_urls",""),
             "price":      r.get("price_mentions",""),
             "open_text":  r.get("opening_hours_text",""),
+            "anchor":     False,
         })
 
     _poi_cache = pois
@@ -203,7 +241,9 @@ def greedy(pois, user_start, user_end):
     return route
 
 def simulated_annealing(initial, num_days, user_start, user_end,
-                        T0=800, alpha=0.995, max_iter=30_000):
+                        T0=800, alpha=0.995, max_iter=30_000,
+                        anchor_names=None):
+    anchor_names = anchor_names or []
     random.seed(42)
     current=list(initial); best=list(current)
     cur_cost=route_cost(current,num_days,user_start,user_end)
@@ -223,7 +263,10 @@ def simulated_annealing(initial, num_days, user_start, user_end,
         else:                            # or-opt: move one element
             i=random.randrange(n); j=random.randrange(n-1)
             if j>=i: j+=1
-            poi=nb.pop(i); nb.insert(j,poi)
+            poi=nb[i]
+            if anchor_names and any(a in poi["name"].lower() for a in anchor_names):
+                T*=alpha; continue       # anchor không bị di chuyển
+            nb.pop(i); nb.insert(j,poi)
         nc=route_cost(nb,num_days,user_start,user_end)
         delta=nc-cur_cost
         if delta<0 or random.random()<math.exp(-delta/T):
@@ -247,24 +290,33 @@ def optimize():
     top_k     = max(num_days*5, min(int(data.get("top_k",40)), 80))
     user_start= int(data.get("start_hour",7))*60
     user_end  = int(data.get("end_hour",21))*60
-    types_filter = data.get("types", [])  # [] = tất cả
+    types_filter  = data.get("types", [])
+    anchor_names  = [a.strip().lower() for a in data.get("anchor_pois", []) if a.strip()]
 
     all_pois = load_pois()
 
-    # Lọc type nếu có
+    # Đánh dấu anchor
+    for p in all_pois:
+        p["anchor"] = any(a in p["name"].lower() for a in anchor_names)
+
+    # Lọc type
     if types_filter:
         filtered = [p for p in all_pois if p["type"] in types_filter]
         if len(filtered) < num_days*3:
-            filtered = all_pois  # fallback nếu lọc quá ít
+            filtered = all_pois
     else:
         filtered = all_pois
 
-    # Top-K theo score
-    pois = sorted(filtered, key=lambda x: x["score"], reverse=True)[:top_k]
+    # Top-K: anchors luôn được giữ
+    anchors  = [p for p in filtered if p["anchor"]]
+    non_anch = [p for p in filtered if not p["anchor"]]
+    non_anch.sort(key=lambda x: x["score"], reverse=True)
+    pois = (anchors + non_anch)[:top_k]
 
     # Optimize
-    g_route = greedy(pois, user_start, user_end)
-    sa_route = simulated_annealing(g_route, num_days, user_start, user_end)
+    g_route  = greedy(pois, user_start, user_end)
+    sa_route = simulated_annealing(g_route, num_days, user_start, user_end,
+                                   anchor_names=anchor_names)
 
     # Build result
     days_data = []
@@ -292,6 +344,8 @@ def optimize():
                 "address":   s["address"],
                 "video_url": s["video_url"],
                 "price":     s["price"],
+                "anchor":    s.get("anchor", False),
+                "visit_min": s.get("visit_min", 45),
             })
         days_data.append({
             "day": d, "color": color,
@@ -307,8 +361,27 @@ def optimize():
             "total_stops": total_stops,
             "rate":        round(total_feas/total_stops*100) if total_stops else 0,
             "num_days":    num_days,
+            "anchors":     [p["name"] for p in pois if p["anchor"]],
         }
     })
+
+@app.route("/api/search_poi")
+def search_poi():
+    """Tìm kiếm POI theo tên — dùng cho autocomplete anchor picker"""
+    q = request.args.get("q","").strip().lower()
+    pois = load_pois()
+    if not q:
+        # Trả về top 20 theo score
+        results = sorted(pois, key=lambda x: x["score"], reverse=True)[:20]
+    else:
+        results = [p for p in pois if q in p["name"].lower()][:15]
+    return jsonify([{
+        "name":   p["name"],
+        "type":   TYPE_VI.get(p["type"], p["type"]),
+        "emoji":  TYPE_EMOJI.get(p["type"], "📍"),
+        "rating": p["rating"],
+        "score":  round(p["score"],3),
+    } for p in results])
 
 @app.route("/api/poi_types")
 def poi_types():
@@ -590,6 +663,28 @@ input[type=number]:focus, select:focus {
 .map-popup b { font-size: 14px; }
 .map-popup .meta { color: #666; margin: 4px 0; }
 .map-popup a { color: #2D7DD2; text-decoration: none; }
+
+/* Anchor tags */
+.anchor-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(200,169,110,0.15); border: 1px solid var(--accent);
+  border-radius: 20px; padding: 3px 10px; font-size: 12px; color: var(--accent);
+}
+.anchor-tag button {
+  background: none; border: none; color: var(--accent);
+  cursor: pointer; padding: 0; font-size: 14px; line-height: 1;
+}
+.anchor-drop-item {
+  padding: 8px 12px; font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  transition: background 0.15s;
+}
+.anchor-drop-item:hover { background: rgba(255,255,255,0.05); }
+.badge-anchor {
+  font-size: 10px; color: var(--accent);
+  background: rgba(200,169,110,0.15);
+  padding: 1px 6px; border-radius: 10px;
+}
 </style>
 </head>
 <body>
@@ -636,6 +731,24 @@ input[type=number]:focus, select:focus {
     <label style="margin-bottom:8px;">Loại địa điểm</label>
     <div id="type-filters">
       <div class="type-pill active" data-type="all">✨ Tất cả</div>
+    </div>
+
+    <label style="margin-bottom:8px; margin-top:4px;">📌 Điểm bắt buộc ghé (tùy chọn)</label>
+    <div id="anchor-section">
+      <div style="position:relative;">
+        <input type="text" id="anchor-input" placeholder="Tìm địa điểm..."
+               autocomplete="off"
+               style="padding-right:32px;"
+               oninput="searchAnchor(this.value)"
+               onkeydown="if(event.key==='Escape') closeAnchorDrop()">
+        <div id="anchor-drop" style="
+          display:none; position:absolute; top:100%; left:0; right:0;
+          background:var(--surface); border:1px solid var(--border);
+          border-radius:8px; max-height:180px; overflow-y:auto; z-index:100;
+          margin-top:4px; box-shadow:0 8px 24px rgba(0,0,0,0.4);
+        "></div>
+      </div>
+      <div id="anchor-tags" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:7px;"></div>
     </div>
 
     <button id="btn-optimize" onclick="optimize()">🗺 Tạo lộ trình</button>
@@ -708,6 +821,57 @@ function toggleType(type, pill) {
   }
 }
 
+// ── Anchor POI picker ──
+let anchorPOIs = [];  // [{name, emoji, type_vi}]
+let anchorDebounce = null;
+
+async function searchAnchor(q) {
+  clearTimeout(anchorDebounce);
+  const drop = document.getElementById('anchor-drop');
+  if (!q.trim()) { drop.style.display='none'; return; }
+  anchorDebounce = setTimeout(async () => {
+    const res = await fetch('/api/search_poi?q='+encodeURIComponent(q));
+    const items = await res.json();
+    if (!items.length) { drop.style.display='none'; return; }
+    drop.innerHTML = items.map(it => `
+      <div class="anchor-drop-item" onclick="addAnchor('${esc(it.name)}','${it.emoji}','${esc(it.type_vi)}')">
+        <span>${it.emoji}</span>
+        <span style="flex:1">${it.name}</span>
+        <span style="color:var(--muted);font-size:11px">⭐${it.rating}</span>
+      </div>`).join('');
+    drop.style.display='block';
+  }, 220);
+}
+
+function addAnchor(name, emoji, type_vi) {
+  if (anchorPOIs.find(a => a.name===name)) { closeAnchorDrop(); return; }
+  anchorPOIs.push({name, emoji, type_vi});
+  renderAnchorTags();
+  document.getElementById('anchor-input').value = '';
+  closeAnchorDrop();
+}
+
+function removeAnchor(name) {
+  anchorPOIs = anchorPOIs.filter(a => a.name !== name);
+  renderAnchorTags();
+}
+
+function renderAnchorTags() {
+  const container = document.getElementById('anchor-tags');
+  container.innerHTML = anchorPOIs.map(a => `
+    <div class="anchor-tag">
+      ${a.emoji} ${a.name}
+      <button onclick="removeAnchor('${esc(a.name)}')" title="Xoá">×</button>
+    </div>`).join('');
+}
+
+function closeAnchorDrop() {
+  document.getElementById('anchor-drop').style.display='none';
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#anchor-section')) closeAnchorDrop();
+});
+
 // ── Optimize ──
 async function optimize() {
   const btn = document.getElementById('btn-optimize');
@@ -715,11 +879,12 @@ async function optimize() {
   document.getElementById('loading').classList.add('show');
 
   const payload = {
-    num_days:   parseInt(document.getElementById('num_days').value),
-    top_k:      parseInt(document.getElementById('top_k').value),
-    start_hour: parseInt(document.getElementById('start_hour').value),
-    end_hour:   parseInt(document.getElementById('end_hour').value),
-    types:      [...selectedTypes],
+    num_days:    parseInt(document.getElementById('num_days').value),
+    top_k:       parseInt(document.getElementById('top_k').value),
+    start_hour:  parseInt(document.getElementById('start_hour').value),
+    end_hour:    parseInt(document.getElementById('end_hour').value),
+    types:       [...selectedTypes],
+    anchor_pois: anchorPOIs.map(a => a.name),
   };
 
   try {
@@ -771,6 +936,8 @@ function renderResult(data) {
             <span class="stop-time">🕐 ${stop.start}–${stop.end}</span>
             <span>${stop.type_vi}</span>
             ${stop.rating ? `<span>⭐ ${stop.rating}</span>` : ''}
+            ${stop.visit_min ? `<span style="color:var(--muted)">⏱ ${stop.visit_min}ph</span>` : ''}
+            ${stop.anchor ? '<span class="badge-anchor">📌 bắt buộc</span>' : ''}
             ${!stop.feasible ? '<span class="badge-infeasible">⚠ ngoài giờ</span>' : ''}
           </div>
         </div>

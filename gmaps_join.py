@@ -40,7 +40,7 @@ DALAT_LNG = 108.4583
 DALAT_RADIUS_KM = 25  # bán kính tìm kiếm tính từ trung tâm Đà Lạt
 
 # Fuzzy match threshold — giảm xuống nếu match rate thấp
-FUZZY_THRESHOLD = 65  # 0-100, càng cao càng chặt
+FUZZY_THRESHOLD = 60  # 0-100, càng cao càng chặt — hạ từ 65->60 để cứu ~31 POI score 60-64
 
 # Delay giữa các request (tránh quota exceeded)
 REQUEST_DELAY = 0.3  # giây

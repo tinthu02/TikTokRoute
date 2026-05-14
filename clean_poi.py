@@ -66,7 +66,22 @@ MANUAL_MERGE = {
     # Fix San May Cau Dalat:
     "san may cau dalat": "Sân Mây Đà Lạt",
     "cà tám đà lạt": "Cà Tám Đà Lạt",  # giữ riêng
+    # Fix Datanla dedup — fuzzy similarity 0.74, cùng 1 khu vực
+    "datanla":        "Thác Datanla",
+    "thác da tanla":  "Thác Datanla",
+    "da tanla":       "Thác Datanla",
 }
+
+# Regex pattern cho tên quá chung chung dạng "Tiệm X" / "Quán X" / "Cafe X" không có tên riêng
+GENERIC_NAME_PATTERNS = [
+    r"^tiệm cafe$",
+    r"^quán cafe$",
+    r"^quán cafe \w+ tại đà lạt$",   # "quán cafe mới toanh tại đà lạt"
+    r"^cafe \w+ tại đà lạt$",
+    r"^tiệm cà phê$",
+    r"^quán cà phê$",
+    r"^nhà hàng \w{1,5}$",           # tên nhà hàng chỉ 1 từ ngắn
+]
 
 # Độ dài tên tối thiểu (tên quá ngắn thường là chung chung)
 MIN_NAME_LENGTH = 4
@@ -87,10 +102,14 @@ def is_blacklisted(name):
     # Khớp chính xác với blacklist
     if name_lower in BLACKLIST:
         return True
-    # Tên CHỈ gồm từ trong blacklist (vd: "Cafe Đà Lạt")
+    # Tên CHỈ gồm từ trong blacklist
     words = set(re.split(r"[\s\-_]+", name_lower))
     if words.issubset(BLACKLIST):
         return True
+    # Khớp pattern tên chung chung
+    for pattern in GENERIC_NAME_PATTERNS:
+        if re.fullmatch(pattern, name_lower):
+            return True
     return False
 
 def filter_raw(pois):
