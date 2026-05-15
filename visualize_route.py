@@ -6,6 +6,12 @@ Input:  dalat_route_3days.csv  (output của giai đoạn 5)
 Output: dalat_route_map.html   (bản đồ tương tác có panel thông tin)
 
 Yêu cầu: pip install folium requests
+
+Thêm panel thông tin tổng quan (km, thời gian di chuyển, 
+số điểm feasible), đặt legend chính giữa phía dưới, 
+chỉ hiển thị km (tắt dặm), cải thiện marker (hình tròn màu theo ngày), 
+dùng AntPath cho hiệu ứng đường chạy, thêm MiniMap, MeasureControl, 
+join tọa độ từ dalat_poi_scored_fix.csv
 =============================================================
 """
 
