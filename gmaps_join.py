@@ -30,9 +30,9 @@ if not GMAPS_API_KEY:
 # CẤU HÌNH
 # ══════════════════════════════════════════════════════════════
 
-INPUT_CSV      = "dalat_poi_clean.csv"
-OUTPUT_MATCHED = "dalat_poi_gmaps.csv"
-OUTPUT_UNMATCHED = "dalat_poi_unmatched.csv"
+INPUT_CSV = "dalat_poi_clean_fix.csv"      # thay vì "dalat_poi_clean.csv"
+OUTPUT_MATCHED = "dalat_poi_gmaps_fix.csv" # nên đặt tên khác để tránh ghi đè
+OUTPUT_UNMATCHED = "dalat_poi_unmatched_fix.csv"
 
 # Bounding box Đà Lạt — lọc kết quả ngoài vùng
 DALAT_LAT = 11.9404
@@ -40,7 +40,7 @@ DALAT_LNG = 108.4583
 DALAT_RADIUS_KM = 25  # bán kính tìm kiếm tính từ trung tâm Đà Lạt
 
 # Fuzzy match threshold — giảm xuống nếu match rate thấp
-FUZZY_THRESHOLD = 60  # 0-100, càng cao càng chặt — hạ từ 65->60 để cứu ~31 POI score 60-64
+FUZZY_THRESHOLD = 65  # 0-100, càng cao càng chặt — hạ từ 65->60 để cứu ~31 POI score 60-64
 
 # Delay giữa các request (tránh quota exceeded)
 REQUEST_DELAY = 0.3  # giây

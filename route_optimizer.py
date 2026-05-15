@@ -1,44 +1,37 @@
 """
 =============================================================
-GIAI ĐOẠN 5 — Tối ưu lộ trình du lịch Đà Lạt (cải tiến)
+GIAI ĐOẠN 5 — Tối ưu lộ trình du lịch Đà Lạt (phiên bản ổn định)
 =============================================================
-SỬA LỖI:
-  1. SA 2 phase: phase 1 tối ưu feasibility, phase 2 tối ưu km với feasibility làm hard constraint
-  2. Dedup sau gmaps_join dựa trên gmaps_place_id (fallback tọa độ)
-  3. K-Means 3D (lat, lng, open_min) để phân cụm theo cả thời gian mở cửa
+- Dedup theo gmaps_place_id
+- K-Means 3D (lat, lng, open_min)
+- SA 2-phase: phase1 chỉ feasibility, phase2 hard constraint trên feasibility
 =============================================================
 """
 
-import csv, math, random, time, os, copy
+import csv, math, random, time, copy
 import numpy as np
 
 # ══════════════════════════════════════════════════════════════
-# CẤU HÌNH NGƯỜI DÙNG
+# CẤU HÌNH
 # ══════════════════════════════════════════════════════════════
 
-INPUT_CSV   = "dalat_poi_scored.csv"
+INPUT_CSV   = "dalat_poi_scored_fix.csv"   # thay vì "dalat_poi_scored.csv"
 NUM_DAYS    = 3
 TOP_K       = 40
-
-# ── ANCHOR POI ──────────────────────────────────────────────
 ANCHOR_POIS: list[str] = []
-# ────────────────────────────────────────────────────────────
 
-USER_START  = 7 * 60    # 07:00
-USER_END    = 21 * 60   # 21:00
+USER_START  = 7 * 60
+USER_END    = 21 * 60
 AVG_SPEED_KMH = 30
 
-# SA params (phase 1 và 2)
 SA_T0        = 500.0
 SA_ALPHA     = 0.9995
 SA_MAX_ITER  = 100_000
 SA_MIN_T     = 0.01
 
-# Trọng số cho phase 1 (chỉ quan tâm feasibility)
 INFEASIBLE_PENALTY      = 500.0
-BALANCE_PENALTY_WEIGHT  = 200.0   # cân bằng số điểm khả thi giữa các ngày
+BALANCE_PENALTY_WEIGHT  = 200.0
 
-# Các tham số cho phase 2 (km, meal, diversity)
 MAX_KM_PER_DAY       = 70.0
 OVER_KM_PENALTY      = 5.0
 MEAL_WINDOWS = [(11*60+30, 13*60), (18*60, 19*60+30)]
@@ -46,7 +39,6 @@ MEAL_BONUS = 100.0
 TYPE_DIVERSITY_WEIGHT = 150.0
 FOOD_TYPES = {"chợ quán", "nhà hàng", "quán ăn", "ăn_uống"}
 
-# Giờ mở cửa mặc định theo loại POI
 DEFAULT_HOURS_BY_TYPE = {
     "thiên nhiên":      (7*60,  18*60),
     "địa điểm checkin": (6*60,  20*60),
@@ -94,7 +86,7 @@ DALAT_LAT = 11.9404
 DALAT_LNG = 108.4583
 
 # ══════════════════════════════════════════════════════════════
-# VISIT DURATION — Infer thông minh
+# VISIT DURATION
 # ══════════════════════════════════════════════════════════════
 
 _BASE_DURATION = {
@@ -123,7 +115,7 @@ def infer_visit_duration(poi_type: str, price_level, reviews_count, csv_value) -
     return max(15, base)
 
 # ══════════════════════════════════════════════════════════════
-# BƯỚC 1 — ĐỌC & CHUẨN BỊ DATA (FIX DEDUP THEO GMAPS_PLACE_ID)
+# LOAD POI (DEDUP THEO GMAPS_PLACE_ID)
 # ══════════════════════════════════════════════════════════════
 
 def load_pois(filepath, top_k, num_days):
@@ -131,8 +123,8 @@ def load_pois(filepath, top_k, num_days):
         rows = list(csv.DictReader(f))
 
     pois = []
-    seen_ids = set()          # lưu gmaps_place_id đã gặp
-    seen_coords = set()       # fallback nếu không có place_id
+    seen_ids = set()
+    seen_coords = set()
 
     for r in rows:
         if str(r.get("include_in_route", "")).strip().lower() not in ("true", "1"):
@@ -143,14 +135,12 @@ def load_pois(filepath, top_k, num_days):
         if lat == 0 or lng == 0:
             continue
 
-        # Ưu tiên dedup theo gmaps_place_id
         place_id = r.get("gmaps_place_id", "").strip()
         if place_id:
             if place_id in seen_ids:
                 continue
             seen_ids.add(place_id)
         else:
-            # fallback: dùng tọa độ (3 số thập phân)
             coord_key = (round(lat, 3), round(lng, 3))
             if coord_key in seen_coords:
                 continue
@@ -207,15 +197,14 @@ def load_pois(filepath, top_k, num_days):
     selected  = selected[:k]
 
     if anchors:
-        print(f"  Anchor POI đã chọn ({len(anchors)}): {[a['name'] for a in anchors]}")
+        print(f"  Anchor POI: {[a['name'] for a in anchors]}")
     else:
-        print(f"  Không có anchor POI — chạy lộ trình tự động")
-
-    print(f"  Sau dedup (place_id) và Top-{k}: {len(selected)} POI")
+        print(f"  Không có anchor — chạy tự động")
+    print(f"  Chọn {len(selected)} POI (đã dedup)")
     return selected
 
 # ══════════════════════════════════════════════════════════════
-# KIỂM TRA RÀNG BUỘC & SIMULATE MỘT NGÀY
+# SIMULATE NGÀY
 # ══════════════════════════════════════════════════════════════
 
 def is_feasible(poi, arrive_time):
@@ -259,30 +248,26 @@ def simulate_day(poi_list):
 
     return total_km, feasible, timeline
 
-# Hàm chỉ trả về số lượng infeasible (dùng cho phase 1)
 def count_infeasible(itinerary):
-    total_infeas = 0
+    total = 0
     for day_pois in itinerary:
         _, feas, _ = simulate_day(day_pois)
-        total_infeas += len(day_pois) - feas
-    return total_infeas
+        total += len(day_pois) - feas
+    return total
 
 # ══════════════════════════════════════════════════════════════
-# K-MEANS 3D (lat, lng, open_min) — FIX LỖI #3
+# K-MEANS 3D (lat, lng, open_min)
 # ══════════════════════════════════════════════════════════════
 
 def kmeans_cluster_3d(pois, num_clusters, max_iter=50):
-    """Phân cụm dựa trên lat, lng, open_min (đã normalize)"""
     n = len(pois)
     if n <= num_clusters:
         return [[i] for i in range(n)]
 
-    # Lấy dữ liệu
     lat_vals = np.array([p["lat"] for p in pois])
     lng_vals = np.array([p["lng"] for p in pois])
     open_vals = np.array([p["open_min"] for p in pois])
 
-    # Normalize từng chiều về [0,1]
     lat_min, lat_max = lat_vals.min(), lat_vals.max()
     lng_min, lng_max = lng_vals.min(), lng_vals.max()
     open_min_all, open_max_all = 0.0, 24*60.0
@@ -291,13 +276,8 @@ def kmeans_cluster_3d(pois, num_clusters, max_iter=50):
     def norm_lng(l): return (l - lng_min) / (lng_max - lng_min + 1e-9)
     def norm_open(o): return o / (open_max_all + 1e-9)
 
-    X = np.column_stack([
-        norm_lat(lat_vals),
-        norm_lng(lng_vals),
-        norm_open(open_vals)
-    ])
+    X = np.column_stack([norm_lat(lat_vals), norm_lng(lng_vals), norm_open(open_vals)])
 
-    # Khởi tạo tâm ngẫu nhiên
     rng = np.random.default_rng(42)
     indices = rng.choice(n, size=num_clusters, replace=False)
     centroids = X[indices].copy()
@@ -316,7 +296,7 @@ def kmeans_cluster_3d(pois, num_clusters, max_iter=50):
     return clusters
 
 # ══════════════════════════════════════════════════════════════
-# GREEDY NỘI BỘ CHO MỘT CỤM (giữ nguyên)
+# GREEDY NỘI BỘ
 # ══════════════════════════════════════════════════════════════
 
 def greedy_day(poi_list):
@@ -353,16 +333,15 @@ def greedy_day(poi_list):
     return route
 
 def initial_itinerary(pois, num_days):
-    clusters = kmeans_cluster_3d(pois, num_days)   # dùng K-Means 3D
+    clusters = kmeans_cluster_3d(pois, num_days)
     itinerary = []
-    for cluster_indices in clusters:
-        day_pois = [pois[i] for i in cluster_indices]
-        sorted_day = greedy_day(day_pois)
-        itinerary.append(sorted_day)
+    for idxs in clusters:
+        day_pois = [pois[i] for i in idxs]
+        itinerary.append(greedy_day(day_pois))
     return itinerary
 
 # ══════════════════════════════════════════════════════════════
-# COST FUNCTION — PHASE 1 (chỉ feasibility)
+# COST FUNCTIONS
 # ══════════════════════════════════════════════════════════════
 
 def cost_phase1(itinerary):
@@ -375,195 +354,176 @@ def cost_phase1(itinerary):
     std_feas = np.std(feasible_counts) if len(feasible_counts) > 1 else 0.0
     return total_infeas * INFEASIBLE_PENALTY + std_feas * BALANCE_PENALTY_WEIGHT
 
-# ══════════════════════════════════════════════════════════════
-# COST FUNCTION — PHASE 2 (km, meal, diversity, nhưng chỉ áp dụng nếu feasibility không đổi)
-# ══════════════════════════════════════════════════════════════
-
 def cost_phase2(itinerary):
     total_km = 0.0
-    meal_bonus_total = 0.0
-    type_diversity_total = 0.0
-    over_km_penalty = 0.0
+    meal_bonus = 0.0
+    type_div = 0.0
+    over_km = 0.0
 
     for day_pois in itinerary:
         km, feas, timeline = simulate_day(day_pois)
         total_km += km
         if km > MAX_KM_PER_DAY:
-            over_km_penalty += (km - MAX_KM_PER_DAY) * OVER_KM_PENALTY
-
+            over_km += (km - MAX_KM_PER_DAY) * OVER_KM_PENALTY
         for stop in timeline:
             if stop["feasible"] and stop["type"] in FOOD_TYPES:
                 start_mins = stop["start"]
-                for (w_start, w_end) in MEAL_WINDOWS:
-                    if w_start <= start_mins <= w_end:
-                        meal_bonus_total += MEAL_BONUS
+                for ws, we in MEAL_WINDOWS:
+                    if ws <= start_mins <= we:
+                        meal_bonus += MEAL_BONUS
                         break
-        # Entropy cho diversity
         type_counts = {}
         for poi in day_pois:
             t = poi["type"]
             type_counts[t] = type_counts.get(t, 0) + 1
-        total_points = len(day_pois)
         entropy = 0.0
-        if total_points > 0:
-            for count in type_counts.values():
-                p = count / total_points
+        if day_pois:
+            for cnt in type_counts.values():
+                p = cnt / len(day_pois)
                 entropy -= p * math.log(p + 1e-9)
-        type_diversity_total += entropy
+        type_div += entropy
 
-    cost = total_km * 2.5 + over_km_penalty - meal_bonus_total - TYPE_DIVERSITY_WEIGHT * type_diversity_total
-    return cost
+    return total_km * 2.5 + over_km - meal_bonus - TYPE_DIVERSITY_WEIGHT * type_div
 
 # ══════════════════════════════════════════════════════════════
-# SIMULATED ANNEALING — PHASE 1 (chỉ feasibility)
+# SA PHASE 1 (chỉ feasibility)
 # ══════════════════════════════════════════════════════════════
 
-def sa_phase1(initial_itinerary):
-    current = copy.deepcopy(initial_itinerary)
+def sa_phase1(init_itin):
+    current = copy.deepcopy(init_itin)
     best = copy.deepcopy(current)
     cur_cost = cost_phase1(current)
     best_cost = cur_cost
     T = SA_T0
     t0 = time.time()
 
-    for iteration in range(SA_MAX_ITER):
+    for it in range(SA_MAX_ITER):
         if T < SA_MIN_T:
             break
         op = random.random()
-        new_itinerary = copy.deepcopy(current)
+        new = copy.deepcopy(current)
 
-        if op < 0.4:
-            day_idx = random.randrange(NUM_DAYS)
-            if len(new_itinerary[day_idx]) >= 2:
-                i, j = random.sample(range(len(new_itinerary[day_idx])), 2)
-                new_itinerary[day_idx][i], new_itinerary[day_idx][j] = new_itinerary[day_idx][j], new_itinerary[day_idx][i]
-        elif op < 0.8:
-            src_day, dst_day = random.sample(range(NUM_DAYS), 2)
-            if len(new_itinerary[src_day]) > 1:
-                idx = random.randrange(len(new_itinerary[src_day]))
-                poi = new_itinerary[src_day][idx]
+        if op < 0.4:   # swap nội bộ
+            d = random.randrange(NUM_DAYS)
+            if len(new[d]) >= 2:
+                i, j = random.sample(range(len(new[d])), 2)
+                new[d][i], new[d][j] = new[d][j], new[d][i]
+        elif op < 0.8: # move
+            src, dst = random.sample(range(NUM_DAYS), 2)
+            if len(new[src]) > 1:
+                idx = random.randrange(len(new[src]))
+                poi = new[src][idx]
                 if poi.get("anchor"):
                     T *= SA_ALPHA
                     continue
-                new_itinerary[src_day].pop(idx)
-                insert_pos = random.randint(0, len(new_itinerary[dst_day]))
-                new_itinerary[dst_day].insert(insert_pos, poi)
-        else:
-            day1, day2 = random.sample(range(NUM_DAYS), 2)
-            if new_itinerary[day1] and new_itinerary[day2]:
-                i = random.randrange(len(new_itinerary[day1]))
-                j = random.randrange(len(new_itinerary[day2]))
-                p1 = new_itinerary[day1][i]
-                p2 = new_itinerary[day2][j]
+                new[src].pop(idx)
+                new[dst].insert(random.randint(0, len(new[dst])), poi)
+        else:          # cross swap
+            d1, d2 = random.sample(range(NUM_DAYS), 2)
+            if new[d1] and new[d2]:
+                i = random.randrange(len(new[d1]))
+                j = random.randrange(len(new[d2]))
+                p1 = new[d1][i]
+                p2 = new[d2][j]
                 if p1.get("anchor") or p2.get("anchor"):
                     T *= SA_ALPHA
                     continue
-                new_itinerary[day1][i], new_itinerary[day2][j] = new_itinerary[day2][j], new_itinerary[day1][i]
+                new[d1][i], new[d2][j] = new[d2][j], new[d1][i]
 
-        new_cost = cost_phase1(new_itinerary)
+        new_cost = cost_phase1(new)
         delta = new_cost - cur_cost
         if delta < 0 or random.random() < math.exp(-delta / T):
-            current = new_itinerary
+            current = new
             cur_cost = new_cost
             if cur_cost < best_cost:
                 best = copy.deepcopy(current)
                 best_cost = cur_cost
         T *= SA_ALPHA
 
-        if (iteration + 1) % 20000 == 0:
-            elapsed = round(time.time() - t0, 1)
-            infeas = count_infeasible(current)
-            print(f"    Phase1 iter {iteration+1:>6} | T={T:.4f} | infeas={infeas} | best_infeas={count_infeasible(best)} | {elapsed}s")
+        if (it+1) % 20000 == 0:
+            print(f"    Phase1 {it+1:6d} | T={T:.4f} | infeas={count_infeasible(current)} | best={count_infeasible(best)} | {time.time()-t0:.1f}s")
     return best, best_cost
 
 # ══════════════════════════════════════════════════════════════
-# SIMULATED ANNEALING — PHASE 2 (tối ưu km, giữ nguyên feasibility)
+# SA PHASE 2 (hard constraint: không tăng infeasible)
 # ══════════════════════════════════════════════════════════════
 
-def sa_phase2(initial_itinerary, target_infeasible):
-    """Chỉ chấp nhận move nếu số infeasible không tăng so với target"""
-    current = copy.deepcopy(initial_itinerary)
+def sa_phase2(init_itin, target_infeas):
+    current = copy.deepcopy(init_itin)
     best = copy.deepcopy(current)
     cur_cost = cost_phase2(current)
     best_cost = cur_cost
     T = SA_T0
     t0 = time.time()
 
-    for iteration in range(SA_MAX_ITER):
+    for it in range(SA_MAX_ITER):
         if T < SA_MIN_T:
             break
         op = random.random()
-        new_itinerary = copy.deepcopy(current)
+        new = copy.deepcopy(current)
 
         if op < 0.4:
-            day_idx = random.randrange(NUM_DAYS)
-            if len(new_itinerary[day_idx]) >= 2:
-                i, j = random.sample(range(len(new_itinerary[day_idx])), 2)
-                new_itinerary[day_idx][i], new_itinerary[day_idx][j] = new_itinerary[day_idx][j], new_itinerary[day_idx][i]
+            d = random.randrange(NUM_DAYS)
+            if len(new[d]) >= 2:
+                i, j = random.sample(range(len(new[d])), 2)
+                new[d][i], new[d][j] = new[d][j], new[d][i]
         elif op < 0.8:
-            src_day, dst_day = random.sample(range(NUM_DAYS), 2)
-            if len(new_itinerary[src_day]) > 1:
-                idx = random.randrange(len(new_itinerary[src_day]))
-                poi = new_itinerary[src_day][idx]
+            src, dst = random.sample(range(NUM_DAYS), 2)
+            if len(new[src]) > 1:
+                idx = random.randrange(len(new[src]))
+                poi = new[src][idx]
                 if poi.get("anchor"):
                     T *= SA_ALPHA
                     continue
-                new_itinerary[src_day].pop(idx)
-                insert_pos = random.randint(0, len(new_itinerary[dst_day]))
-                new_itinerary[dst_day].insert(insert_pos, poi)
+                new[src].pop(idx)
+                new[dst].insert(random.randint(0, len(new[dst])), poi)
         else:
-            day1, day2 = random.sample(range(NUM_DAYS), 2)
-            if new_itinerary[day1] and new_itinerary[day2]:
-                i = random.randrange(len(new_itinerary[day1]))
-                j = random.randrange(len(new_itinerary[day2]))
-                p1 = new_itinerary[day1][i]
-                p2 = new_itinerary[day2][j]
+            d1, d2 = random.sample(range(NUM_DAYS), 2)
+            if new[d1] and new[d2]:
+                i = random.randrange(len(new[d1]))
+                j = random.randrange(len(new[d2]))
+                p1 = new[d1][i]
+                p2 = new[d2][j]
                 if p1.get("anchor") or p2.get("anchor"):
                     T *= SA_ALPHA
                     continue
-                new_itinerary[day1][i], new_itinerary[day2][j] = new_itinerary[day2][j], new_itinerary[day1][i]
+                new[d1][i], new[d2][j] = new[d2][j], new[d1][i]
 
-        # Hard constraint: không được làm tăng số infeasible
-        new_infeas = count_infeasible(new_itinerary)
-        if new_infeas > target_infeasible:
+        if count_infeasible(new) > target_infeas:
             T *= SA_ALPHA
             continue
 
-        new_cost = cost_phase2(new_itinerary)
+        new_cost = cost_phase2(new)
         delta = new_cost - cur_cost
         if delta < 0 or random.random() < math.exp(-delta / T):
-            current = new_itinerary
+            current = new
             cur_cost = new_cost
             if cur_cost < best_cost:
                 best = copy.deepcopy(current)
                 best_cost = cur_cost
         T *= SA_ALPHA
 
-        if (iteration + 1) % 20000 == 0:
-            elapsed = round(time.time() - t0, 1)
-            print(f"    Phase2 iter {iteration+1:>6} | T={T:.4f} | cost={cur_cost:.1f} | best={best_cost:.1f} | {elapsed}s")
+        if (it+1) % 20000 == 0:
+            print(f"    Phase2 {it+1:6d} | T={T:.4f} | cost={cur_cost:.1f} | best={best_cost:.1f} | {time.time()-t0:.1f}s")
     return best, best_cost
 
 # ══════════════════════════════════════════════════════════════
-# LƯU KẾT QUẢ & IN
+# LƯU VÀ IN KẾT QUẢ
 # ══════════════════════════════════════════════════════════════
 
-def save_route(itinerary, filepath, method="SA"):
+def save_route(itinerary, filepath, method):
     rows = []
-    total_km_all = 0.0
-    total_feas_all = 0
-    total_stop_all = 0
-
-    for d, day_pois in enumerate(itinerary, 1):
-        km, feas, timeline = simulate_day(day_pois)
-        total_km_all += km
-        total_feas_all += feas
-        total_stop_all += len(day_pois)
-
-        timeline_sorted = sorted(timeline, key=lambda x: x["start"])
-        for stop_idx, stop in enumerate(timeline_sorted, 1):
+    total_km = 0.0
+    total_feas = 0
+    total_stops = 0
+    for d, day in enumerate(itinerary, 1):
+        km, feas, timeline = simulate_day(day)
+        total_km += km
+        total_feas += feas
+        total_stops += len(day)
+        for s, stop in enumerate(sorted(timeline, key=lambda x: x["start"]), 1):
             rows.append({
-                "day": d, "stop": stop_idx, "method": method,
+                "day": d, "stop": s, "method": method,
                 "name": stop["name"], "type": stop["type"],
                 "arrive": fmt_min(stop["arrive"]),
                 "start_visit": fmt_min(stop["start"]),
@@ -575,30 +535,25 @@ def save_route(itinerary, filepath, method="SA"):
                 "address": stop["address"],
                 "video_url": stop["video_url"],
             })
-
     with open(filepath, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=rows[0].keys())
         writer.writeheader()
         writer.writerows(rows)
+    print(f"  [{method}] Km={total_km:.1f} | Feasible={total_feas}/{total_stops} ({round(100*total_feas/total_stops)}%) -> {filepath}")
+    return total_km, total_feas, total_stops
 
-    print(f"  [{method}] Tổng km: {total_km_all:.1f} | "
-          f"Feasible: {total_feas_all}/{total_stop_all} "
-          f"({round(total_feas_all/total_stop_all*100)}%) -> {filepath}")
-    return total_km_all, total_feas_all, total_stop_all
-
-def print_route(itinerary, method="SA"):
+def print_route(itinerary, title):
     print(f"\n  {'='*60}")
-    print(f"  LỊCH TRÌNH {NUM_DAYS} NGÀY — {method}")
+    print(f"  LỊCH TRÌNH {NUM_DAYS} NGÀY — {title}")
     print(f"  {'='*60}")
-    for d, day_pois in enumerate(itinerary, 1):
-        km, feas, timeline = simulate_day(day_pois)
+    for d, day in enumerate(itinerary, 1):
+        km, feas, timeline = simulate_day(day)
         timeline_sorted = sorted(timeline, key=lambda x: x["start"])
-        print(f"\n  📅 NGÀY {d} — {km:.1f}km | {feas}/{len(day_pois)} địa điểm đúng giờ")
+        print(f"\n  📅 NGÀY {d} — {km:.1f}km | {feas}/{len(day)} feasible")
         print(f"  {'-'*55}")
         for stop in timeline_sorted:
             status = "✅" if stop["feasible"] else "⚠️"
-            print(f"    {status} {fmt_min(stop['start'])}-{fmt_min(stop['end'])}  "
-                  f"{stop['name'][:30]:<30}  ({stop['type'][:15]})  ⭐{stop['rating']}")
+            print(f"    {status} {fmt_min(stop['start'])}-{fmt_min(stop['end'])}  {stop['name'][:30]:<30} ({stop['type'][:12]}) ⭐{stop['rating']}")
 
 # ══════════════════════════════════════════════════════════════
 # MAIN
@@ -610,47 +565,45 @@ def main():
     t_start = time.time()
 
     print("\n" + "="*60)
-    print(f"  GIAI ĐOẠN 5 — Route Optimizer ({NUM_DAYS} ngày, Top-{TOP_K})")
-    print(f"  Khung giờ: {fmt_min(USER_START)} - {fmt_min(USER_END)}")
-    print(f"  SA Phase1: chỉ tối ưu feasibility | Phase2: tối ưu km (feasibility hard)")
+    print(f"  ROUTE OPTIMIZER — {NUM_DAYS} ngày, Top {TOP_K} POI")
+    print(f"  Giờ: {fmt_min(USER_START)} - {fmt_min(USER_END)}")
+    print(f"  SA 2-phase (hard constraint)")
     print("="*60)
 
-    print(f"\nBước 1: Load POI (dedup theo gmaps_place_id)...")
+    print("\nBước 1: Load POI...")
     pois = load_pois(INPUT_CSV, TOP_K, NUM_DAYS)
 
-    print(f"\nBước 2: Khởi tạo lịch trình (K-Means 3D + Greedy nội bộ)...")
+    print("\nBước 2: Khởi tạo K-Means 3D + Greedy...")
     init_itin = initial_itinerary(pois, NUM_DAYS)
-    km_init, feas_init, stops_init = save_route(init_itin,
-        f"dalat_route_greedy_{NUM_DAYS}days.csv", method="Greedy (K-Means 3D)")
+    save_route(init_itin, "dalat_route_greedy_3d.csv", "Greedy 3D")
     print_route(init_itin, "Greedy (K-Means 3D)")
 
-    print(f"\nBước 3: SA Phase 1 — Tối ưu feasibility...")
+    print("\nBước 3: SA Phase 1 (feasibility)...")
     feas_itin, _ = sa_phase1(init_itin)
-    target_infeas = count_infeasible(feas_itin)
-    print(f"  Phase 1 kết thúc: số điểm không khả thi = {target_infeas}")
-    save_route(feas_itin, "dalat_route_phase1.csv", method="SA_Phase1")
+    target = count_infeasible(feas_itin)
+    print(f"  Phase 1 done: infeasible = {target}")
+    save_route(feas_itin, "dalat_route_phase1.csv", "SA_Phase1")
 
-    print(f"\nBước 4: SA Phase 2 — Tối ưu km (giữ nguyên feasibility ≤ {target_infeas})...")
-    sa_itin, _ = sa_phase2(feas_itin, target_infeas)
-    km_sa, feas_sa, stops_sa = save_route(sa_itin,
-        f"dalat_route_{NUM_DAYS}days.csv", method="SA_Phase2")
-    print_route(sa_itin, "SA (2-phase)")
+    print("\nBước 4: SA Phase 2 (km, hard constraint)...")
+    final_itin, _ = sa_phase2(feas_itin, target)
+    km_final, feas_final, stops_final = save_route(final_itin, f"dalat_route_{NUM_DAYS}days.csv", "SA_Phase2")
+    print_route(final_itin, "SA 2-phase")
 
-    # So sánh
-    elapsed = round(time.time() - t_start, 1)
+    km_init, feas_init, stops_init = simulate_day(init_itin[0])[0], sum(1 for d in init_itin for _ in d), sum(len(d) for d in init_itin)  # quick
+    # Actually get from saved data: we recompute
+    km_greedy, feas_greedy, _ = save_route(init_itin, "temp.csv", "temp")  # dummy
+    import os; os.remove("temp.csv")
     print(f"\n  {'='*60}")
-    print(f"  SO SÁNH GREEDY (K-Means 3D) vs SA 2-PHASE")
+    print(f"  SO SÁNH")
     print(f"  {'='*60}")
-    print(f"  {'Chỉ số':<30} {'Greedy':>10} {'SA 2-phase':>12} {'Cải thiện':>12}")
+    print(f"  {'Chỉ số':<30} {'Greedy 3D':>12} {'SA 2-phase':>12} {'Cải thiện':>12}")
     print(f"  {'-'*60}")
-
-    km_imp   = round((km_init - km_sa) / km_init * 100, 1) if km_init > 0 else 0
-    feas_imp = round((feas_sa - feas_init) / max(stops_init, 1) * 100, 1)
-
-    print(f"  {'Tổng km di chuyển':<30} {km_init:>10.1f} {km_sa:>12.1f} {km_imp:>+11.1f}%")
-    print(f"  {'Feasible stops':<30} {feas_init:>10} {feas_sa:>12} {feas_imp:>+11.1f}%")
-    print(f"  {'Feasibility rate':<30} {round(feas_init/stops_init*100):>9}% {round(feas_sa/stops_sa*100):>11}%")
-    print(f"\n  Thời gian chạy: {elapsed}s")
+    km_imp = (km_greedy - km_final)/km_greedy*100 if km_greedy>0 else 0
+    feas_imp = (feas_final - feas_greedy)/stops_final*100
+    print(f"  {'Tổng km':<30} {km_greedy:>12.1f} {km_final:>12.1f} {km_imp:>+11.1f}%")
+    print(f"  {'Feasible stops':<30} {feas_greedy:>12} {feas_final:>12} {feas_imp:>+11.1f}%")
+    print(f"  {'Feasibility rate':<30} {round(100*feas_greedy/stops_init):>11}% {round(100*feas_final/stops_final):>11}%")
+    print(f"\n  Thời gian: {time.time()-t_start:.1f}s")
     print(f"  Output: dalat_route_{NUM_DAYS}days.csv")
     print("="*60)
 

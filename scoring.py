@@ -17,8 +17,8 @@ from collections import defaultdict
 # CẤU HÌNH
 # ══════════════════════════════════════════════════════════════
 
-INPUT_CSV  = "dalat_poi_gmaps.csv"
-OUTPUT_CSV = "dalat_poi_scored.csv"
+INPUT_CSV  = "dalat_poi_gmaps_fix.csv"   # thay vì "dalat_poi_gmaps.csv"
+OUTPUT_CSV = "dalat_poi_scored_fix.csv"  # nên đặt tên riêng
 
 W_TIKTOK = 0.6   # tín hiệu viral TikTok
 W_GMAPS  = 0.4   # chất lượng Google Maps
@@ -132,12 +132,20 @@ def load_and_merge(filepath):
             merged[key]["total_plays"] += safe_int(r.get("total_plays", 0))
             merged[key]["confidence_high"] += safe_int(r.get("confidence_high", 0))
 
-            # Nối video URLs (tránh trùng lặp)
+            # Gộp video URLs: ưu tiên video của place_name chính xác
+            # (không nối tất cả, tránh lấy video "quán cafe gần X" cho địa điểm X)
             new_urls = r.get("video_urls", "")
             if new_urls:
                 existing = merged[key].get("video_urls", "")
-                if new_urls not in existing:
-                    merged[key]["video_urls"] = existing + " | " + new_urls if existing else new_urls
+                canonical_name = merged[key].get("place_name", "").lower()
+                # Chỉ thêm URL nếu place_name của dòng mới khớp tên chuẩn
+                row_name = r.get("place_name", "").lower()
+                # Token match: tên dòng mới phải có ít nhất 1 token chính của tên chuẩn
+                canonical_tokens = set(t for t in canonical_name.split() if len(t) >= 3)
+                row_tokens = set(t for t in row_name.split() if len(t) >= 3)
+                if canonical_tokens & row_tokens:  # có token chung
+                    if new_urls not in existing:
+                        merged[key]["video_urls"] = existing + " | " + new_urls if existing else new_urls
 
             # Nối aliases
             new_alias = r.get("aliases", "")

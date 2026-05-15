@@ -1,16 +1,20 @@
 """
 =============================================================
-GIAI ĐOẠN 6 — Trực quan hóa lộ trình trên bản đồ
+GIAI ĐOẠN 6 — Trực quan hóa lộ trình trên bản đồ (cải tiến)
 =============================================================
 Input:  dalat_route_3days.csv  (output của giai đoạn 5)
-Output: dalat_route_map.html   (bản đồ tương tác)
+Output: dalat_route_map.html   (bản đồ tương tác có panel thông tin)
 
-Yêu cầu: pip install folium
+Yêu cầu: pip install folium requests
 =============================================================
 """
 
-import csv, folium, os
+import csv
+import folium
+import os
+import requests
 from folium import plugins
+from folium.plugins import AntPath
 
 # ══════════════════════════════════════════════════════════════
 # CẤU HÌNH
@@ -19,159 +23,236 @@ from folium import plugins
 INPUT_CSV  = "dalat_route_3days.csv"
 OUTPUT_MAP = "dalat_route_map.html"
 
-# Màu cho từng ngày
+# Màu sắc đẹp cho từng ngày
 DAY_COLORS = {
-    1: "#E74C3C",   # đỏ
-    2: "#2980B9",   # xanh dương
-    3: "#27AE60",   # xanh lá
+    1: "#FF6B6B",   # đỏ san hô
+    2: "#4ECDC4",   # xanh ngọc
+    3: "#FFE66D",   # vàng kem
 }
 
-# Icon cho từng type
-TYPE_ICONS = {
-    "cafe":              ("coffee",  "white"),
-    "nhà hàng":          ("cutlery", "white"),
-    "chợ quán":          ("shopping-cart", "white"),
-    "địa điểm checkin":  ("camera",  "white"),
-    "thiên nhiên":       ("tree",    "white"),
-    "quán ăn":           ("cutlery", "white"),
-    "khác":              ("info-sign","white"),
-}
+# Tốc độ trung bình (km/h) để tính thời gian di chuyển
+AVG_SPEED = 30
 
 DALAT_CENTER = [11.9404, 108.4583]
 
 # ══════════════════════════════════════════════════════════════
-# ĐỌC DATA
+# HÀM TIỆN ÍCH
 # ══════════════════════════════════════════════════════════════
 
-def load_route(filepath):
+def get_tiktok_thumbnail(video_url):
+    """Lấy thumbnail từ TikTok qua oembed (tuỳ chọn)"""
+    if not video_url:
+        return ""
+    try:
+        oembed_url = f"https://www.tiktok.com/oembed?url={video_url}"
+        resp = requests.get(oembed_url, timeout=3)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get("thumbnail_url", "")
+    except:
+        pass
+    return ""
+
+def fmt_min(minutes):
+    if minutes is None:
+        return "?"
+    h = int(minutes) // 60
+    m = int(minutes) % 60
+    return f"{h:02d}:{m:02d}"
+
+# ══════════════════════════════════════════════════════════════
+# ĐỌC DATA VÀ TÍNH TOÁN THÔNG TIN NGÀY
+# ══════════════════════════════════════════════════════════════
+
+def load_route_with_stats(filepath):
     with open(filepath, encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
 
-    # Gom theo ngày
     days = {}
+    day_stats = {}
     for row in rows:
         d = int(row["day"])
         if d not in days:
             days[d] = []
+            day_stats[d] = {
+                "total_km": 0.0,
+                "total_travel_min": 0,
+                "feasible": 0,
+                "total_stops": 0,
+                "start_time": None,
+                "end_time": None,
+            }
         days[d].append(row)
-    return days
+        km = float(row.get("dist_km", 0))
+        day_stats[d]["total_km"] += km
+        day_stats[d]["total_stops"] += 1
+        if row.get("feasible", "").lower() == "true":
+            day_stats[d]["feasible"] += 1
+        start_str = row.get("start_visit", "")
+        end_str = row.get("end_visit", "")
+        if start_str and ":" in start_str:
+            h, m = map(int, start_str.split(":"))
+            start_min = h*60 + m
+            if day_stats[d]["start_time"] is None or start_min < day_stats[d]["start_time"]:
+                day_stats[d]["start_time"] = start_min
+        if end_str and ":" in end_str:
+            h, m = map(int, end_str.split(":"))
+            end_min = h*60 + m
+            if day_stats[d]["end_time"] is None or end_min > day_stats[d]["end_time"]:
+                day_stats[d]["end_time"] = end_min
+
+    for d in day_stats:
+        km = day_stats[d]["total_km"]
+        day_stats[d]["travel_time_min"] = round(km / AVG_SPEED * 60, 1)
+
+    return days, day_stats
 
 # ══════════════════════════════════════════════════════════════
-# BUILD MAP
+# BUILD MAP VỚI PANEL THÔNG TIN
 # ══════════════════════════════════════════════════════════════
 
-def build_map(days):
+def build_map(days, day_stats):
     m = folium.Map(
         location=DALAT_CENTER,
         zoom_start=13,
-        tiles="CartoDB positron",
+        tiles="CartoDB Voyager",
+        attr='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> & CartoDB',
     )
 
-    # Layer control — bật/tắt từng ngày
+    # Thêm control bổ trợ (chỉ hiển thị km)
+    plugins.Fullscreen().add_to(m)
+    plugins.MeasureControl(position='topright', primary_length_unit='kilometers', secondary_length_unit=None).add_to(m)
+    plugins.MiniMap().add_to(m)
+
+    # Layer groups
     day_groups = {}
     for d in sorted(days.keys()):
         group = folium.FeatureGroup(name=f"📅 Ngày {d}", show=True)
         day_groups[d] = group
         m.add_child(group)
 
+    # Vẽ các điểm và đường
     for d, stops in sorted(days.items()):
-        color    = DAY_COLORS.get(d, "#888888")
-        group    = day_groups[d]
-        coords   = []  # để vẽ polyline
-
+        color = DAY_COLORS.get(d, "#888888")
+        group = day_groups[d]
+        coords = []
         for idx, stop in enumerate(stops, 1):
             lat = float(stop.get("lat") or stop.get("latitude") or 0)
             lng = float(stop.get("lng") or stop.get("longitude") or 0)
             if lat == 0 or lng == 0:
                 continue
-
             coords.append([lat, lng])
-
-            poi_type  = stop.get("type", "khác").strip().lower()
-            icon_name, icon_color = TYPE_ICONS.get(poi_type, ("info-sign", "white"))
-            feasible  = str(stop.get("feasible", "True")).strip().lower() in ("true", "1")
-            status    = "✅" if feasible else "⚠️ Ngoài giờ"
-
-            # Popup HTML
+            poi_type = stop.get("type", "khác").strip().lower()
+            feasible = str(stop.get("feasible", "True")).strip().lower() in ("true", "1")
+            status_icon = "✅" if feasible else "⚠️"
             video_url = stop.get("video_url", "")
-            video_html = f'<a href="{video_url}" target="_blank">🎬 Xem TikTok</a>' if video_url else ""
-            address   = stop.get("address", "")
-            rating    = stop.get("rating", "")
-            score     = stop.get("attraction_score", "")
-
+            thumb_url = get_tiktok_thumbnail(video_url)
+            thumb_html = f'<img src="{thumb_url}" width="120" style="border-radius:8px; margin-top:5px;"><br>' if thumb_url else ""
             popup_html = f"""
-            <div style="font-family:Arial; min-width:220px; font-size:13px;">
-                <b style="color:{color}; font-size:15px;">{idx}. {stop['name']}</b><br>
-                <span style="color:#666;">{poi_type} &nbsp;|&nbsp; Ngày {d}</span><br>
-                <hr style="margin:5px 0;">
-                🕐 <b>{stop.get('start_visit','?')}</b> – <b>{stop.get('end_visit','?')}</b>
-                &nbsp; {status}<br>
-                ⭐ Rating: <b>{rating}</b>
-                &nbsp; 📊 Score: <b>{score}</b><br>
-                📍 {address}<br>
-                {video_html}
+            <div style="font-family: 'Segoe UI', Arial; min-width: 240px; max-width: 300px;">
+                <div style="background:{color}; padding:6px 10px; border-radius:8px 8px 0 0; color:white; font-weight:bold;">
+                    {status_icon} <span style="font-size:1.1em;">{idx}. {stop['name']}</span>
+                </div>
+                <div style="padding:10px;">
+                    <div style="margin-bottom:5px;">
+                        <span style="color:#666;">{poi_type.upper()}</span> &nbsp;|&nbsp; Ngày {d}
+                    </div>
+                    <div>🕒 <b>{stop.get('start_visit','?')}</b> – <b>{stop.get('end_visit','?')}</b> &nbsp; {status_icon if feasible else '⚠️ Ngoài giờ'}</div>
+                    <div>⭐ {stop.get('rating', 'N/A')} &nbsp; 📊 Score: {stop.get('attraction_score', 'N/A')}</div>
+                    <div>📍 {stop.get('address', '')[:60]}</div>
+                    {thumb_html}
+                    <div style="margin-top:6px;"><a href="{video_url}" target="_blank" style="color:#4ECDC4;">🎬 Xem TikTok</a></div>
+                </div>
             </div>
             """
-
-            # Marker số thứ tự
-            folium.Marker(
-                location=[lat, lng],
-                popup=folium.Popup(popup_html, max_width=280),
-                tooltip=f"Ngày {d} #{idx}: {stop['name']}",
-                icon=folium.DivIcon(
-                    html=f"""
-                    <div style="
-                        background:{color};
-                        color:white;
-                        border-radius:50%;
-                        width:28px; height:28px;
-                        display:flex; align-items:center; justify-content:center;
-                        font-weight:bold; font-size:12px;
-                        border: 2px solid white;
-                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-                        opacity: {'1.0' if feasible else '0.5'};
-                    ">{idx}</div>
-                    """,
-                    icon_size=(28, 28),
-                    icon_anchor=(14, 14),
-                )
-            ).add_to(group)
-
-        # Vẽ polyline nối các điểm trong ngày
+            icon = folium.DivIcon(
+                html=f"""
+                <div style="
+                    background:{color};
+                    color:white;
+                    border-radius:50%;
+                    width:32px; height:32px;
+                    display:flex; align-items:center; justify-content:center;
+                    font-weight:bold; font-size:13px;
+                    border:2px solid white;
+                    box-shadow:0 2px 6px rgba(0,0,0,0.3);
+                    opacity:{'1.0' if feasible else '0.6'};
+                ">{idx}</div>
+                """,
+                icon_size=(32, 32),
+                icon_anchor=(16, 16),
+            )
+            folium.Marker([lat, lng], popup=folium.Popup(popup_html, max_width=300),
+                          tooltip=f"Ngày {d} #{idx}: {stop['name']}", icon=icon).add_to(group)
         if len(coords) >= 2:
-            folium.PolyLine(
-                locations=coords,
-                color=color,
-                weight=3,
-                opacity=0.7,
-                dash_array="8 4",
-                tooltip=f"Lộ trình Ngày {d}",
-            ).add_to(group)
+            folium.PolyLine(coords, color=color, weight=4, opacity=0.8, dash_array="10, 5",
+                            tooltip=f"Lộ trình Ngày {d}").add_to(group)
+            AntPath(coords, color=color, weight=3, opacity=0.6, delay=1000).add_to(group)
 
-        # Mũi tên hướng di chuyển
-        plugins.AntPath(
-            locations=coords,
-            color=color,
-            weight=3,
-            opacity=0.5,
-            delay=800,
-        ).add_to(group)
-
-    # Layer control
-    folium.LayerControl(collapsed=False).add_to(m)
-
-    # Legend
-    legend_html = """
-    <div style="
-        position: fixed; bottom: 30px; left: 30px; z-index: 1000;
-        background: white; padding: 12px 16px; border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-family: Arial; font-size: 13px;
+    # === PANEL THÔNG TIN TỔNG QUAN (góc dưới bên trái, nâng lên để không đè lên legend) ===
+    panel_html = """
+    <div id="route-info-panel" style="
+        position: fixed;
+        bottom: 80px;
+        left: 20px;
+        background: rgba(0,0,0,0.75);
+        backdrop-filter: blur(8px);
+        color: white;
+        padding: 10px 14px;
+        border-radius: 12px;
+        font-family: 'Segoe UI', Arial;
+        font-size: 12px;
+        z-index: 1000;
+        max-width: 280px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        border-left: 4px solid #FF6B6B;
+        pointer-events: none;
     ">
-        <b>🗺️ Lộ trình Đà Lạt</b><br>
-        <span style="color:#E74C3C;">●</span> Ngày 1 &nbsp;
-        <span style="color:#2980B9;">●</span> Ngày 2 &nbsp;
-        <span style="color:#27AE60;">●</span> Ngày 3<br>
-        <span style="opacity:0.5">○</span> Infeasible (ngoài giờ mở cửa)
+        <div style="font-weight:bold; margin-bottom:8px; font-size:14px;">🚀 THÔNG TIN LỘ TRÌNH</div>
+    """
+    for d in sorted(day_stats.keys()):
+        s = day_stats[d]
+        color = DAY_COLORS.get(d, "#888")
+        start_str = fmt_min(s["start_time"]) if s["start_time"] else "?"
+        end_str = fmt_min(s["end_time"]) if s["end_time"] else "?"
+        panel_html += f"""
+        <div style="margin-bottom:8px; border-left: 2px solid {color}; padding-left: 8px;">
+            <div><span style="background:{color}; padding:2px 8px; border-radius:20px; font-size:10px;">📅 NGÀY {d}</span></div>
+            <div>📍 {s['total_stops']} điểm • ✅ {s['feasible']} khả thi</div>
+            <div>🛣️ {s['total_km']:.1f} km • 🕒 {s['travel_time_min']:.0f} phút di chuyển</div>
+            <div>⏰ {start_str} – {end_str}</div>
+        </div>
+        """
+    panel_html += """
+        <div style="font-size:10px; color:#ccc; margin-top:5px;">💡 Nhấp vào marker để xem chi tiết</div>
+    </div>
+    """
+    m.get_root().html.add_child(folium.Element(panel_html))
+
+    # === CHÚ THÍCH MÀU NGÀY (đặt dưới cùng, chính giữa) ===
+    legend_html = f"""
+    <div style="
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(4px);
+        color: white;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        z-index: 1000;
+        font-family: 'Segoe UI', Arial;
+        pointer-events: none;
+        white-space: nowrap;
+        display: flex;
+        gap: 16px;
+    ">
+        <span><span style="color:#FF6B6B; font-weight:bold;">●</span> Ngày 1</span>
+        <span><span style="color:#4ECDC4; font-weight:bold;">●</span> Ngày 2</span>
+        <span><span style="color:#FFE66D; font-weight:bold;">●</span> Ngày 3</span>
+        <span><span style="opacity:0.7; margin-left:8px;">○</span> Ngoài giờ</span>
     </div>
     """
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -179,74 +260,63 @@ def build_map(days):
     return m
 
 # ══════════════════════════════════════════════════════════════
-# MAIN
+# JOIN COORDINATES (giữ nguyên)
 # ══════════════════════════════════════════════════════════════
 
-def main():
-    print("\n" + "="*55)
-    print("  GIAI ĐOẠN 6 — Visualize lộ trình")
-    print("="*55)
-
-    # Kiểm tra file input có lat/lng không
-    # (file route chỉ có từ scored nên cần join lại)
-    with open(INPUT_CSV, encoding="utf-8-sig") as f:
-        cols = f.readline()
-    has_coords = "lat" in cols or "latitude" in cols
-
-    if not has_coords:
-        print("\n  ⚠️  File route chưa có tọa độ lat/lng.")
-        print("  Đang join với dalat_poi_scored.csv...")
-        join_coords()
-
-    print(f"\n  Đọc lộ trình từ {INPUT_CSV}...")
-    days = load_route(INPUT_CSV)
-
-    total_stops = sum(len(v) for v in days.values())
-    print(f"  {len(days)} ngày | {total_stops} điểm dừng")
-
-    print(f"\n  Tạo bản đồ...")
-    m = build_map(days)
-    m.save(OUTPUT_MAP)
-
-    print(f"\n  ✅ Đã lưu bản đồ -> {OUTPUT_MAP}")
-    print(f"  Mở file trong trình duyệt để xem lộ trình tương tác.")
-    print("="*55)
-
-
 def join_coords():
-    """Join tọa độ từ scored CSV vào route CSV nếu chưa có"""
-    scored_path = "dalat_poi_scored.csv"
+    scored_path = "dalat_poi_scored_fix.csv"
     if not os.path.exists(scored_path):
         print(f"  Không tìm thấy {scored_path}!")
         return
-
-    # Đọc coords từ scored
     coords_map = {}
     with open(scored_path, encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
-            coords_map[row["place_name"]] = {
-                "lat": row.get("lat", ""),
-                "lng": row.get("lng", ""),
-            }
-
-    # Đọc route
+            coords_map[row["place_name"]] = {"lat": row.get("lat", ""), "lng": row.get("lng", "")}
     with open(INPUT_CSV, encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
-
-    # Join
     for row in rows:
         c = coords_map.get(row["name"], {})
         row["lat"] = c.get("lat", "")
         row["lng"] = c.get("lng", "")
-
-    # Ghi lại
     with open(INPUT_CSV, "w", encoding="utf-8-sig", newline="") as f:
         fieldnames = list(rows[0].keys())
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-    print(f"  Join xong: {len(rows)} dòng")
+    print(f"  Đã cập nhật tọa độ cho {len(rows)} điểm.")
 
+# ══════════════════════════════════════════════════════════════
+# MAIN
+# ══════════════════════════════════════════════════════════════
+
+def main():
+    print("\n" + "="*55)
+    print("  GIAI ĐOẠN 6 — Visualize lộ trình (có panel thông tin)")
+    print("="*55)
+
+    if not os.path.exists(INPUT_CSV):
+        print(f"\n  ❌ Không tìm thấy file {INPUT_CSV}")
+        print("  Hãy chạy route_optimizer.py trước.")
+        return
+
+    with open(INPUT_CSV, encoding="utf-8-sig") as f:
+        cols = f.readline()
+    if "lat" not in cols and "latitude" not in cols:
+        print("\n  ⚠️  File route chưa có tọa độ lat/lng. Đang join...")
+        join_coords()
+
+    print("\n  Đọc và tính toán thông tin lộ trình...")
+    days, day_stats = load_route_with_stats(INPUT_CSV)
+    total_stops = sum(len(v) for v in days.values())
+    print(f"  {len(days)} ngày | {total_stops} điểm dừng")
+
+    print("\n  Tạo bản đồ (có thể mất vài giây)...")
+    m = build_map(days, day_stats)
+    m.save(OUTPUT_MAP)
+
+    print(f"\n  ✅ Đã lưu bản đồ -> {OUTPUT_MAP}")
+    print("  Mở file trong trình duyệt để xem lộ trình và thông tin chi tiết.")
+    print("="*55)
 
 if __name__ == "__main__":
     main()
