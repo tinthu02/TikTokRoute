@@ -12,6 +12,10 @@ Yêu cầu:
 .env cần có:
   GMAPS_API_KEY=AIza...
   (Bật: Places API + Distance Matrix API trong Google Cloud Console)
+  
+Cập nhật INPUT_CSV = 'dalat_poi_clean_fix.csv', 
+OUTPUT_MATCHED = 'dalat_poi_gmaps_fix.csv', 
+tăng FUZZY_THRESHOLD từ 60 lên 65 để match chính xác hơn
 =============================================================
 """
 
