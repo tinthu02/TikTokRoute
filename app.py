@@ -6,6 +6,11 @@ Yêu cầu: pip install flask folium
 
 Chạy: python app.py
 Mở trình duyệt: http://localhost:5000
+
+Web app hoàn chỉnh, POI_CSV = 'dalat_poi_scored_fix.csv', 
+giao diện dark mode, timeline có thể thu gọn/mở rộng, hiển thị km, 
+thời gian di chuyển, feasible, cho phép chọn anchor POI, 
+tích hợp Leaflet marker tùy chỉnh
 =============================================================
 """
 
