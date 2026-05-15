@@ -5,6 +5,10 @@ GIAI ĐOẠN 5 — Tối ưu lộ trình du lịch Đà Lạt (phiên bản ổn
 - Dedup theo gmaps_place_id
 - K-Means 3D (lat, lng, open_min)
 - SA 2-phase: phase1 chỉ feasibility, phase2 hard constraint trên feasibility
+
+INPUT_CSV = 'dalat_poi_scored_fix.csv', sử dụng K-Means 3D (lat,lng,open_min), 
+SA 2-phase (phase1 tối ưu feasibility, phase2 hard constraint giữ nguyên infeasible), 
+xuất ra dalat_route_3days.csv
 =============================================================
 """
 
