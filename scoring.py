@@ -7,6 +7,10 @@ Cải tiến:
   - Cộng dồn tín hiệu TikTok (mention, digg, plays, conf)
   - Xử lý giờ mở cửa qua đêm (close < open)
   - Giữ lại video_urls, aliases để hiển thị
+  
+Gộp POI trùng lặp theo gmaps_place_id, 
+cộng dồn mention/digg/plays, chỉ nối video_urls khi có token chung với tên chuẩn, 
+thêm ablation test 3 cấu hình trọng số, INPUT_CSV = 'dalat_poi_gmaps_fix.csv'
 =============================================================
 """
 
