@@ -7,6 +7,10 @@ Output: dalat_poi_clean_final.csv    (đã lọc, gộp tên, viết hoa)
 
 Yêu cầu: pip install requests
 Ollama phải đang chạy với model qwen2.5:7b
+
+Mở rộng BLACKLIST và GENERIC_NAME_PATTERNS, thêm manual merge cho 'săn mây', 
+bổ sung trường video_caption, lọc tên chung chung sau dedup (nướng, cà phê, cơm trưa...), 
+viết hoa tên địa điểm, cập nhật input/output _fix
 =============================================================
 """
 
