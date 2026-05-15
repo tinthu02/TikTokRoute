@@ -11,6 +11,10 @@ Các lỗi đã fix:
 Yêu cầu: pip install apify-client python-dotenv requests
 Cài Ollama: https://ollama.com
 Sau đó chạy: ollama pull qwen2.5:7b
+
+Sửa lỗi NameError 'place_name', thêm hàm is_list_video() lọc video tổng hợp, 
+kiểm tra tên địa điểm xuất hiện trong nội dung, mỗi video chỉ sinh tối đa 1 POI, 
+gộp 'săn mây' thành 'Cà phê săn mây Đà Lạt'
 """
 
 import os
