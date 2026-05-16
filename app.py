@@ -15,7 +15,7 @@ tích hợp Leaflet marker tùy chỉnh
 """
 
 from flask import Flask, render_template_string, request, jsonify
-import csv, math, random, json, os
+import csv, math, random, json, os, sqlite3
 
 app = Flask(__name__)
 
@@ -174,6 +174,26 @@ def route_cost(route, num_days, user_start, user_end):
         total_km += km; total_inf += len(day_pois)-feas
     return total_km + total_inf*50
 
+def get_user_weight(user_id, category):
+
+    conn = sqlite3.connect("user_preferences.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT weight
+        FROM preferences
+        WHERE user_id=? AND category=?
+    """, (user_id, category))
+
+    row = cursor.fetchone()
+
+    conn.close()
+
+    if row:
+        return row[0]
+
+    return 0
+
 def greedy(pois, user_start, user_end):
     unvisited = list(pois); route = []
     cur_lat, cur_lng = DALAT_CENTER; cur_time = user_start
@@ -184,7 +204,8 @@ def greedy(pois, user_start, user_end):
             ok,start,end=is_feasible(p, cur_time+tm, user_end)
             if not ok: continue
             dist=haversine_km(cur_lat,cur_lng,p["lat"],p["lng"])
-            val=p["score"]/(dist+0.1)
+            user_weight = get_user_weight(1, p["type"])
+            val = (p["score"]+user_weight)/(dist + 0.1)
             if val>best_val: best_val=val; best=p
         if best is None:
             best=min(unvisited, key=lambda p: haversine_km(cur_lat,cur_lng,p["lat"],p["lng"]))
@@ -303,10 +324,56 @@ def search_poi():
 
 @app.route("/api/poi_types")
 def poi_types():
-    pois = load_pois()
+    pois = load_pois()  
     types = sorted(set(p["type"] for p in pois))
     return jsonify([{"value": t, "label": TYPE_VI.get(t,t), "emoji": TYPE_EMOJI.get(t,"📍")} for t in types])
 
+@app.route("/api/feedback", methods=["POST"])
+def feedback():
+
+    data = request.json
+
+    user_id = data["user_id"]
+    category = data["category"]
+    rating = data["rating"]
+
+    conn = sqlite3.connect("user_preferences.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT weight
+        FROM preferences
+        WHERE user_id=? AND category=?
+    """, (user_id, category))
+
+    row = cursor.fetchone()
+
+    if row:
+        old_weight = row[0]
+
+        new_weight = old_weight + (rating / 5) * 0.1
+
+        cursor.execute("""
+            UPDATE preferences
+            SET weight=?
+            WHERE user_id=? AND category=?
+        """, (new_weight, user_id, category))
+
+    else:
+        new_weight = rating / 5
+
+        cursor.execute("""
+            INSERT INTO preferences
+            VALUES (?, ?, ?)
+        """, (user_id, category, new_weight))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "message": "feedback saved",
+        "new_weight": new_weight
+    })
 # ══════════════════════════════════════════════════════════════
 # HTML TEMPLATE (CẢI TIẾN)
 # ══════════════════════════════════════════════════════════════
