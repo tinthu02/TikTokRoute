@@ -1,26 +1,22 @@
 """
 =============================================================
-GIAI ĐOẠN 7 — Web App lộ trình Đà Lạt (cải tiến giao diện)
+GIAI ĐOẠN 7 — Web App lộ trình Đà Lạt (bố cục thông minh)
 =============================================================
 Yêu cầu: pip install flask folium
 
 Chạy: python app.py
 Mở trình duyệt: http://localhost:5000
-
-Web app hoàn chỉnh, POI_CSV = 'dalat_poi_scored_fix.csv', 
-giao diện dark mode, timeline có thể thu gọn/mở rộng, hiển thị km, 
-thời gian di chuyển, feasible, cho phép chọn anchor POI, 
-tích hợp Leaflet marker tùy chỉnh
 =============================================================
 """
 
 from flask import Flask, render_template_string, request, jsonify
 import csv, math, random, json, os
+from weather import get_rainy_days
 
 app = Flask(__name__)
 
 # ══════════════════════════════════════════════════════════════
-# CONFIG
+# CONFIG (giữ nguyên)
 # ══════════════════════════════════════════════════════════════
 
 POI_CSV = "dalat_poi_scored_fix.csv"
@@ -38,6 +34,8 @@ TYPE_EMOJI = {
     "cafe": "☕", "nhà hàng": "🍽️", "chợ quán": "🛒", "địa điểm checkin": "📸",
     "thiên nhiên": "🌿", "quán ăn": "🥢", "homestay": "🏠", "khách sạn": "🏨", "khác": "📍",
 }
+
+OUTDOOR_TYPES = {"thiên nhiên", "địa điểm checkin"}
 
 # ══════════════════════════════════════════════════════════════
 # HELPERS (giữ nguyên)
@@ -134,7 +132,7 @@ def load_pois():
     return pois
 
 # ══════════════════════════════════════════════════════════════
-# OPTIMIZER (giữ nguyên, chỉ đổi tên hàm nếu cần)
+# OPTIMIZER (giữ nguyên)
 # ══════════════════════════════════════════════════════════════
 
 def is_feasible(poi, arrive, user_end):
@@ -228,7 +226,7 @@ def simulated_annealing(initial, num_days, user_start, user_end, T0=800, alpha=0
     return best
 
 # ══════════════════════════════════════════════════════════════
-# ROUTES
+# API ROUTES (giữ nguyên)
 # ══════════════════════════════════════════════════════════════
 
 @app.route("/")
@@ -243,7 +241,11 @@ def optimize():
     user_start = int(data.get("start_hour",7))*60
     user_end = int(data.get("end_hour",21))*60
     types_filter = data.get("types", [])
+    preferences = data.get("preferences", {})
     anchor_names = [a.strip().lower() for a in data.get("anchor_pois", []) if a.strip()]
+
+    rainy_days = get_rainy_days(num_days)
+    print(f"Dự báo thời tiết {num_days} ngày: {rainy_days}")
 
     all_pois = load_pois()
     for p in all_pois:
@@ -256,10 +258,29 @@ def optimize():
     else:
         filtered = all_pois
 
+    pref_type_map = {
+        'adventure': ['thiên nhiên', 'địa điểm checkin'],
+        'relax': ['cafe', 'homestay'],
+        'food': ['nhà hàng', 'chợ quán', 'quán ăn'],
+        'checkin': ['địa điểm checkin', 'cafe']
+    }
+    if any(preferences.values()):
+        for p in filtered:
+            factor = 1.0
+            for pref, active in preferences.items():
+                if active and p['type'] in pref_type_map.get(pref, []):
+                    factor = max(factor, 1.5)
+            p['score'] = p['score'] * factor
+
     anchors = [p for p in filtered if p["anchor"]]
     non_anch = [p for p in filtered if not p["anchor"]]
     non_anch.sort(key=lambda x: x["score"], reverse=True)
     pois = (anchors + non_anch)[:top_k]
+
+    if any(rainy_days):
+        original_count = len(pois)
+        pois = [p for p in pois if p['type'] not in OUTDOOR_TYPES]
+        print(f"  Do dự báo mưa, đã loại {original_count - len(pois)} POI ngoài trời")
 
     g_route = greedy(pois, user_start, user_end)
     sa_route = simulated_annealing(g_route, num_days, user_start, user_end, anchor_names=anchor_names)
@@ -288,6 +309,10 @@ def optimize():
             "total_km": round(total_km,1), "feasible": total_feas, "total_stops": total_stops,
             "rate": round(total_feas/total_stops*100) if total_stops else 0, "num_days": num_days,
             "anchors": [p["name"] for p in pois if p["anchor"]],
+        },
+        "weather": {
+            "rainy_days": rainy_days,
+            "outdoor_removed": any(rainy_days),
         }
     })
 
@@ -308,7 +333,7 @@ def poi_types():
     return jsonify([{"value": t, "label": TYPE_VI.get(t,t), "emoji": TYPE_EMOJI.get(t,"📍")} for t in types])
 
 # ══════════════════════════════════════════════════════════════
-# HTML TEMPLATE (CẢI TIẾN)
+# HTML TEMPLATE (anchor input đồng bộ)
 # ══════════════════════════════════════════════════════════════
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -316,7 +341,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Đà Lạt Route Planner - Lộ trình thông minh</title>
+<title>Đà Lạt Route Planner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -332,11 +357,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   --accent-glow: rgba(212,184,122,0.2);
   --text: #f0f2f5;
   --text-muted: #9ca3af;
-  --day1: #FF6B6B;
-  --day2: #4ECDC4;
-  --day3: #FFE66D;
-  --day4: #A37CFF;
-  --day5: #FF8C42;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 body {
@@ -350,8 +370,6 @@ body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-
-/* Sidebar */
 #sidebar {
   width: 420px;
   min-width: 360px;
@@ -362,141 +380,327 @@ body {
   overflow: hidden;
   z-index: 10;
 }
-#sidebar-header {
-  padding: 24px 24px 16px;
+/* Header có nút toggle */
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(135deg, #0a0c12 0%, #141822 100%);
 }
-#sidebar-header h1 {
+.sidebar-header h1 {
   font-family: 'Playfair Display', serif;
-  font-size: 26px;
+  font-size: 22px;
   background: linear-gradient(135deg, var(--accent), #f5e6c4);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
-#sidebar-header p { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
-
-/* Form */
-#form-section { padding: 20px 24px; border-bottom: 1px solid var(--border); background: rgba(20,24,34,0.6); }
-.form-row { display: flex; gap: 16px; margin-bottom: 16px; }
-.form-group { flex: 1; }
-label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
-input, select {
-  width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
-  color: var(--text); padding: 10px 14px; font-size: 14px; font-family: 'Inter', sans-serif;
-  outline: none; transition: all 0.2s;
+.toggle-form-btn {
+  background: rgba(212,184,122,0.2);
+  border: 1px solid var(--accent);
+  border-radius: 30px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: pointer;
+  transition: 0.2s;
 }
-input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
-
-#type-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+.toggle-form-btn:hover {
+  background: var(--accent);
+  color: #0a0c12;
+}
+/* Form section – collapsible */
+#form-section {
+  background: rgba(20,24,34,0.6);
+  border-bottom: 1px solid var(--border);
+  transition: max-height 0.4s ease, padding 0.3s;
+  overflow-y: auto;
+  padding: 0 20px;
+}
+#form-section.collapsed {
+  max-height: 0 !important;
+  padding: 0 20px !important;
+  border-bottom: none;
+}
+#form-inner {
+  padding: 20px 0;
+}
+/* 4 input trên 1 hàng */
+.form-row-compact {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.form-group {
+  flex: 1;
+}
+.form-group label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.form-group input, .form-group select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+}
+/* Type filters & preferences */
+#type-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
 .type-pill {
-  background: var(--bg); border: 1px solid var(--border); border-radius: 40px;
-  padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
 }
 .type-pill.active { background: var(--accent); border-color: var(--accent); color: #0a0c12; }
-
-.anchor-tag {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: rgba(212,184,122,0.12); border: 1px solid var(--accent);
-  border-radius: 40px; padding: 4px 12px 4px 10px; font-size: 12px; color: var(--accent);
+.preference-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0 12px;
 }
-.anchor-tag button { background: none; border: none; color: var(--accent); cursor: pointer; margin-left: 4px; }
-.anchor-drop-item { padding: 10px 14px; font-size: 13px; cursor: pointer; display: flex; gap: 10px; }
+.preference-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+/* Anchor section cải tiến - đồng bộ input */
+#anchor-section {
+  margin: 8px 0 12px;
+}
+#anchor-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 8px 10px 8px 32px;
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%23d4b87a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>');
+  background-repeat: no-repeat;
+  background-position: 10px center;
+}
+#anchor-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+#anchor-drop {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+.anchor-drop-item {
+  padding: 10px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  transition: background 0.15s;
+  border-bottom: 1px solid var(--border);
+}
+.anchor-drop-item:last-child { border-bottom: none; }
 .anchor-drop-item:hover { background: var(--surface-light); }
-
+.anchor-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(212,184,122,0.15);
+  border: 1px solid var(--accent);
+  border-radius: 40px;
+  padding: 4px 10px 4px 12px;
+  font-size: 12px;
+  color: var(--accent);
+}
+.anchor-tag button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 16px;
+  cursor: pointer;
+  margin-left: 4px;
+  line-height: 1;
+}
+.anchor-tag button:hover {
+  color: #ff5e5e;
+}
 #btn-optimize {
-  width: 100%; background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-  color: #0a0c12; border: none; border-radius: 14px; padding: 12px; font-size: 15px;
-  font-weight: 700; cursor: pointer; margin-top: 12px;
+  width: 100%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #0a0c12;
+  border: none;
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 12px;
 }
-#btn-optimize:disabled { opacity: 0.5; cursor: not-allowed; }
-
+/* Summary bar dạng cột */
 #summary-bar {
-  display: none; padding: 12px 24px; background: rgba(212,184,122,0.08);
-  border-bottom: 1px solid var(--border); gap: 24px; flex-wrap: wrap; font-size: 13px;
+  display: none;
+  padding: 12px 20px;
+  background: rgba(212,184,122,0.08);
+  border-bottom: 1px solid var(--border);
+  justify-content: space-around;
+  text-align: center;
 }
-#summary-bar span { display: flex; align-items: center; gap: 6px; }
-#summary-bar b { color: var(--accent); font-size: 18px; margin-right: 4px; }
-
+.summary-item {
+  flex: 1;
+}
+.summary-item .label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.summary-item .value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.2;
+}
+.summary-item .unit {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+#weather-banner {
+  padding: 8px 16px;
+  background: rgba(96,165,250,0.1);
+  border-bottom: 1px solid rgba(96,165,250,0.3);
+  font-size: 11px;
+  color: #93c5fd;
+  display: none;
+}
 /* Timeline */
+#timeline {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
 .day-section { border-bottom: 1px solid var(--border); }
 .day-header {
-  display: flex; align-items: center; gap: 12px; padding: 14px 24px;
-  background: var(--surface-light); cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--surface-light);
+  cursor: pointer;
 }
-.day-header:hover { background: #1e2432; }
-.day-dot { width: 12px; height: 12px; border-radius: 50%; }
-.day-header h3 { font-size: 15px; font-weight: 600; flex: 1; }
-.day-stats { font-size: 11px; color: var(--text-muted); display: flex; gap: 16px; }
-.day-stats span { display: flex; align-items: center; gap: 4px; }
-
+.day-dot { width: 10px; height: 10px; border-radius: 50%; }
+.day-header h3 { font-size: 14px; font-weight: 600; flex: 1; }
+.day-stats { font-size: 10px; color: var(--text-muted); display: flex; gap: 12px; }
 .stop-item {
-  display: flex; gap: 14px; padding: 10px 24px 10px 40px; cursor: pointer;
+  display: flex;
+  gap: 12px;
+  padding: 8px 20px 8px 36px;
+  cursor: pointer;
   border-left: 3px solid transparent;
 }
 .stop-item:hover { background: rgba(255,255,255,0.03); }
-.stop-item.active { background: var(--accent-glow); border-left-color: var(--accent); }
 .stop-num {
-  width: 26px; height: 26px; border-radius: 50%; display: flex;
-  align-items: center; justify-content: center; font-size: 11px; font-weight: 700;
-  color: white; background: var(--accent);
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
 }
-.stop-body { flex: 1; min-width: 0; }
-.stop-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.stop-meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 10px; }
-.stop-time { color: var(--accent); font-weight: 500; }
-.badge-infeasible { background: rgba(255,94,94,0.15); color: #ff5e5e; padding: 2px 8px; border-radius: 20px; font-size: 10px; }
-.badge-anchor { background: rgba(212,184,122,0.15); color: var(--accent); padding: 2px 8px; border-radius: 20px; font-size: 10px; }
-
+.stop-name { font-size: 13px; font-weight: 500; }
+.stop-meta { font-size: 10px; color: var(--text-muted); display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
 #map-container { flex: 1; position: relative; }
 #map { width: 100%; height: 100%; }
 #loading {
-  display: none; position: absolute; inset: 0; background: rgba(10,12,18,0.9);
-  backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center;
-  flex-direction: column; gap: 16px;
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(10,12,18,0.9);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
 }
 #loading.show { display: flex; }
-.spinner { width: 44px; height: 44px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+.spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-@media (max-width: 768px) {
-  #sidebar { width: 100%; position: absolute; left: -100%; transition: 0.3s; z-index: 20; }
-  #sidebar.open { left: 0; }
-}
 </style>
 </head>
 <body>
 
 <div id="sidebar">
-  <div id="sidebar-header">
+  <div class="sidebar-header">
     <h1>🏔 Đà Lạt Planner</h1>
-    <p>Lộ trình thông minh từ TikTok & Google Maps</p>
+    <div class="toggle-form-btn" onclick="toggleForm()" id="toggleBtn">▲ Thu gọn</div>
   </div>
-  <div id="form-section">
-    <div class="form-row">
-      <div class="form-group"><label>Số ngày</label><input type="number" id="num_days" value="3" min="1" max="5"></div>
-      <div class="form-group"><label>Số POI tối đa</label><input type="number" id="top_k" value="40" min="10" max="80"></div>
+
+  <div id="form-section" style="max-height: 500px;">
+    <div id="form-inner">
+      <div class="form-row-compact">
+        <div class="form-group"><label>Số ngày</label><input type="number" id="num_days" value="3" min="1" max="5"></div>
+        <div class="form-group"><label>Số POI</label><input type="number" id="top_k" value="40" min="10" max="80"></div>
+        <div class="form-group"><label>Bắt đầu</label><select id="start_hour"><option value="6">06:00</option><option value="7" selected>07:00</option><option value="8">08:00</option><option value="9">09:00</option></select></div>
+        <div class="form-group"><label>Kết thúc</label><select id="end_hour"><option value="19">19:00</option><option value="20">20:00</option><option value="21" selected>21:00</option><option value="22">22:00</option></select></div>
+      </div>
+
+      <label>🧭 Sở thích du lịch</label>
+      <div class="preference-group">
+        <label><input type="checkbox" id="pref_adventure"> 🏔 Mạo hiểm</label>
+        <label><input type="checkbox" id="pref_relax"> 🌿 Thư giãn</label>
+        <label><input type="checkbox" id="pref_food"> 🍜 Ăn uống</label>
+        <label><input type="checkbox" id="pref_checkin"> 📸 Check-in</label>
+      </div>
+
+      <label>Loại địa điểm</label>
+      <div id="type-filters"><div class="type-pill active" data-type="all">✨ Tất cả</div></div>
+
+      <label>📌 Điểm bắt buộc</label>
+      <div id="anchor-section">
+        <div style="position:relative;">
+          <input type="text" id="anchor-input" placeholder="Tìm địa điểm..." autocomplete="off">
+          <div id="anchor-drop"></div>
+        </div>
+        <div id="anchor-tags" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;"></div>
+      </div>
+      <button id="btn-optimize" onclick="optimize()">🗺 Tối ưu lộ trình</button>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>Bắt đầu lúc</label><select id="start_hour"><option value="6">06:00</option><option value="7" selected>07:00</option><option value="8">08:00</option><option value="9">09:00</option></select></div>
-      <div class="form-group"><label>Kết thúc lúc</label><select id="end_hour"><option value="19">19:00</option><option value="20">20:00</option><option value="21" selected>21:00</option><option value="22">22:00</option></select></div>
-    </div>
-    <label>Loại địa điểm</label>
-    <div id="type-filters"><div class="type-pill active" data-type="all">✨ Tất cả</div></div>
-    <label>📌 Điểm bắt buộc</label>
-    <div id="anchor-section">
-      <div style="position:relative;"><input type="text" id="anchor-input" placeholder="Tìm địa điểm..." autocomplete="off"><div id="anchor-drop" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--surface); border:1px solid var(--border); border-radius:12px; max-height:200px; overflow-y:auto; z-index:100; margin-top:4px;"></div></div>
-      <div id="anchor-tags" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
-    </div>
-    <button id="btn-optimize" onclick="optimize()">🗺 Tối ưu lộ trình</button>
   </div>
-  <div id="summary-bar">
-    <span>🗺 <b id="s-km">-</b> km</span>
-    <span>✅ <b id="s-rate">-</b>% đúng giờ</span>
-    <span>📍 <b id="s-stops">-</b> điểm</span>
+
+  <div id="summary-bar" style="display:none;">
+    <div class="summary-item"><div class="label">Tổng km</div><div class="value" id="s-km">-</div><div class="unit">km</div></div>
+    <div class="summary-item"><div class="label">Đúng giờ</div><div class="value" id="s-rate">-</div><div class="unit">%</div></div>
+    <div class="summary-item"><div class="label">Địa điểm</div><div class="value" id="s-stops">-</div><div class="unit">/ -</div></div>
   </div>
-  <div id="timeline" style="flex:1; overflow-y:auto;">
+
+  <div id="weather-banner"></div>
+  <div id="timeline">
     <div style="padding:40px 20px; text-align:center; color:var(--text-muted);">⬅️ Nhập thông tin và bấm tạo lộ trình</div>
   </div>
 </div>
@@ -507,7 +711,6 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px v
 </div>
 
 <script>
-// Khởi tạo bản đồ
 const map = L.map('map', { zoomControl: false }).setView([11.9404, 108.4583], 13);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB', maxZoom: 19 }).addTo(map);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
@@ -516,7 +719,19 @@ let allLayers = [];
 let selectedTypes = new Set();
 let anchorPOIs = [];
 
-// Load loại hình
+// Toggle form
+function toggleForm() {
+  const formSection = document.getElementById('form-section');
+  const btn = document.getElementById('toggleBtn');
+  if (formSection.classList.contains('collapsed')) {
+    formSection.classList.remove('collapsed');
+    btn.innerHTML = '▲ Thu gọn';
+  } else {
+    formSection.classList.add('collapsed');
+    btn.innerHTML = '▼ Mở rộng';
+  }
+}
+
 fetch('/api/poi_types').then(r=>r.json()).then(types => {
   const container = document.getElementById('type-filters');
   types.forEach(t => {
@@ -547,7 +762,6 @@ function toggleType(type, pill) {
   }
 }
 
-// Anchor
 let anchorDebounce;
 async function searchAnchor(q) {
   clearTimeout(anchorDebounce);
@@ -557,7 +771,7 @@ async function searchAnchor(q) {
     const res = await fetch('/api/search_poi?q='+encodeURIComponent(q));
     const items = await res.json();
     if (!items.length) { drop.style.display='none'; return; }
-    drop.innerHTML = items.map(it => `<div class="anchor-drop-item" onclick="addAnchor('${esc(it.name)}','${it.emoji}','${esc(it.type_vi)}')"><span>${it.emoji}</span><span style="flex:1">${it.name}</span><span style="color:var(--text-muted);font-size:11px">⭐${it.rating}</span></div>`).join('');
+    drop.innerHTML = items.map(it => `<div class="anchor-drop-item" onclick="addAnchor('${esc(it.name)}','${it.emoji}','${esc(it.type)}')"><span>${it.emoji}</span><span style="flex:1">${it.name}</span><span style="color:var(--text-muted);font-size:11px">⭐${it.rating}</span></div>`).join('');
     drop.style.display='block';
   }, 220);
 }
@@ -578,11 +792,16 @@ document.addEventListener('click', e => { if (!e.target.closest('#anchor-section
 document.getElementById('anchor-input').addEventListener('input', e => searchAnchor(e.target.value));
 document.getElementById('anchor-input').addEventListener('keydown', e => { if(e.key==='Escape') closeAnchorDrop(); });
 
-// Tối ưu
 async function optimize() {
   const btn = document.getElementById('btn-optimize');
   btn.disabled = true;
   document.getElementById('loading').classList.add('show');
+  const preferences = {
+    adventure: document.getElementById('pref_adventure').checked,
+    relax: document.getElementById('pref_relax').checked,
+    food: document.getElementById('pref_food').checked,
+    checkin: document.getElementById('pref_checkin').checked,
+  };
   const payload = {
     num_days: parseInt(document.getElementById('num_days').value),
     top_k: parseInt(document.getElementById('top_k').value),
@@ -590,11 +809,18 @@ async function optimize() {
     end_hour: parseInt(document.getElementById('end_hour').value),
     types: [...selectedTypes],
     anchor_pois: anchorPOIs.map(a=>a.name),
+    preferences: preferences,
   };
   try {
     const res = await fetch('/api/optimize', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
     const data = await res.json();
     renderResult(data);
+    // Sau khi có kết quả, thu gọn form
+    const formSection = document.getElementById('form-section');
+    if (!formSection.classList.contains('collapsed')) {
+      formSection.classList.add('collapsed');
+      document.getElementById('toggleBtn').innerHTML = '▼ Mở rộng';
+    }
   } catch(e) { alert('Lỗi: '+e.message); }
   finally { btn.disabled=false; document.getElementById('loading').classList.remove('show'); }
 }
@@ -603,9 +829,9 @@ function renderResult(data) {
   allLayers.forEach(l => map.removeLayer(l));
   allLayers = [];
   const s = data.summary;
-  document.getElementById('s-km').textContent = s.total_km;
-  document.getElementById('s-rate').textContent = s.rate;
-  document.getElementById('s-stops').textContent = s.feasible + '/' + s.total_stops;
+  document.getElementById('s-km').innerHTML = s.total_km;
+  document.getElementById('s-rate').innerHTML = s.rate;
+  document.getElementById('s-stops').innerHTML = s.feasible + '/' + s.total_stops;
   document.getElementById('summary-bar').style.display = 'flex';
 
   let html = '';
@@ -617,8 +843,8 @@ function renderResult(data) {
         <h3>Ngày ${day.day}</h3>
         <div class="day-stats">
           <span>🛣️ ${day.km} km</span>
-          <span>🕒 ${travelMins} phút di chuyển</span>
-          <span>✅ ${day.feasible}/${day.total} đúng giờ</span>
+          <span>🕒 ${travelMins} phút</span>
+          <span>✅ ${day.feasible}/${day.total}</span>
         </div>
         <span style="font-size:12px;">▼</span>
       </div>
@@ -643,7 +869,6 @@ function renderResult(data) {
   });
   document.getElementById('timeline').innerHTML = html;
 
-  // Vẽ bản đồ
   const bounds = [];
   data.days.forEach(day => {
     const coords = [];
@@ -651,7 +876,7 @@ function renderResult(data) {
       const latlng = [stop.lat, stop.lng];
       coords.push(latlng);
       bounds.push(latlng);
-      const icon = L.divIcon({ html: `<div style="background:${day.color};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);opacity:${stop.feasible?1:0.4};">${stop.idx}</div>`, iconSize:[28,28], iconAnchor:[14,14] });
+      const icon = L.divIcon({ html: `<div style="background:${day.color};color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);opacity:${stop.feasible?1:0.4};">${stop.idx}</div>`, iconSize:[26,26], iconAnchor:[13,13] });
       const popupHtml = `<div class="map-popup"><b>${stop.name}</b><br><div class="meta">${stop.emoji} ${stop.type_vi} | Ngày ${day.day} #${stop.idx}</div>🕐 ${stop.start}–${stop.end} ${stop.feasible?'✅':'⚠️'}<br>${stop.rating?`⭐ ${stop.rating}`:''} ${stop.address?`<br>📍 ${stop.address}`:''}${stop.video_url?`<br><a href="${stop.video_url}" target="_blank">🎬 TikTok</a>`:''}</div>`;
       const marker = L.marker(latlng, {icon}).bindPopup(popupHtml, {maxWidth:280}).addTo(map);
       allLayers.push(marker);
@@ -662,6 +887,16 @@ function renderResult(data) {
     }
   });
   if (bounds.length) map.fitBounds(bounds, {padding:[40,40]});
+
+  const weatherBanner = document.getElementById('weather-banner');
+  if (data.weather && data.weather.outdoor_removed) {
+    const rainyCount = data.weather.rainy_days.filter(Boolean).length;
+    const total = data.weather.rainy_days.length;
+    weatherBanner.innerHTML = '🌧 Dự báo mưa ' + rainyCount + '/' + total + ' ngày — đã ẩn địa điểm ngoài trời (núi, thác, check-in). Bỏ tick sở thích Mạo hiểm để xem thêm.';
+    weatherBanner.style.display = 'block';
+  } else {
+    weatherBanner.style.display = 'none';
+  }
 }
 
 function toggleDay(header) {
@@ -685,7 +920,7 @@ if __name__ == "__main__":
         print("   Chạy scoring.py trước để tạo file này.")
     else:
         print("\n" + "="*50)
-        print("  🏔  Đà Lạt Route Planner (cải tiến)")
+        print("  🏔  Đà Lạt Route Planner (bố cục thông minh)")
         print("="*50)
         print(f"  Mở trình duyệt: http://localhost:5000")
         print("  Ctrl+C để dừng server")
