@@ -12,6 +12,7 @@ GIAI ĐOẠN 5 — Tối ưu lộ trình du lịch Đà Lạt (có tích hợp t
 import csv, math, random, time, copy
 import numpy as np
 from weather import get_rainy_days  # thêm dòng này
+import argparse
 
 # ══════════════════════════════════════════════════════════════
 # CẤU HÌNH
@@ -574,11 +575,23 @@ def print_route(itinerary, title):
             status = "✅" if stop["feasible"] else "⚠️"
             print(f"    {status} {fmt_min(stop['start'])}-{fmt_min(stop['end'])}  {stop['name'][:30]:<30} ({stop['type'][:12]}) ⭐{stop['rating']}")
 
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Route Optimizer for Da Lat')
+    parser.add_argument('--num_days', type=int, default=NUM_DAYS, help='Number of days')
+    parser.add_argument('--top_k', type=int, default=TOP_K, help='Number of POIs')
+    parser.add_argument('--anchor_pois', type=str, nargs='*', default=ANCHOR_POIS, help='Anchor POI names')
+    return parser.parse_args()
 # ══════════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════════
 
 def main():
+    args = parse_args()
+    global NUM_DAYS, TOP_K, ANCHOR_POIS
+    NUM_DAYS = args.num_days
+    TOP_K = args.top_k
+    ANCHOR_POIS = args.anchor_pois
     random.seed(42)
     np.random.seed(42)
     t_start = time.time()
@@ -619,7 +632,13 @@ def main():
     feas_imp = (feas_final - feas_greedy)/stops_final*100
     print(f"  {'Tổng km':<30} {km_greedy:>12.1f} {km_final:>12.1f} {km_imp:>+11.1f}%")
     print(f"  {'Feasible stops':<30} {feas_greedy:>12} {feas_final:>12} {feas_imp:>+11.1f}%")
-    print(f"  {'Feasibility rate':<30} {round(100*feas_greedy/len(init_itin[0]) if init_itin else 0):>11}% {round(100*feas_final/stops_final):>11}%")
+    #print(f"  {'Feasibility rate':<30} {round(100*feas_greedy/len(init_itin[0]) if init_itin else 0):>11}% {round(100*feas_final/stops_final):>11}%")
+    greedy_total_stops = sum(len(day) for day in init_itin) if init_itin else 0
+    if greedy_total_stops == 0:
+        greedy_rate = 0
+    else:
+        greedy_rate = round(100 * feas_greedy / greedy_total_stops)
+    print(f"  {'Feasibility rate':<30} {greedy_rate:>11}% {round(100*feas_final/stops_final):>11}%")
     print(f"\n  Thời gian: {time.time()-t_start:.1f}s")
     print(f"  Output: dalat_route_{NUM_DAYS}days.csv")
     print("="*60)
