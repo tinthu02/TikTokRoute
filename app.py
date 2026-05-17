@@ -160,7 +160,9 @@ def simulate_day(poi_list, user_start, user_end, start_lat=None, start_lng=None)
     return total_km, feasible, sorted(timeline, key=lambda x: x["start"])
 
 def split_days(route, num_days):
-    sorted_route = sorted(route, key=lambda p: p["lat"])
+    # sorted_route = sorted(route, key=lambda p: p["lat"])
+    # Giữ nguyên thứ tự từ SA optimizer thay vì sort theo lat
+    sorted_route = route
     n=len(sorted_route); days=[]; size=n//num_days; rem=n%num_days; idx=0
     for d in range(num_days):
         end=idx+size+(1 if d<rem else 0); days.append(sorted_route[idx:end]); idx=end
@@ -303,6 +305,13 @@ def optimize():
 
     anchors = [p for p in filtered if p["anchor"]]
     non_anch = [p for p in filtered if not p["anchor"]]
+
+    # Giảm score theo khoảng cách từ điểm xuất phát (nếu có)
+    if start_lat and start_lng:
+        for p in non_anch:
+            dist = haversine_km(start_lat, start_lng, p["lat"], p["lng"])
+            p["score"] = p["score"] / (1 + dist * 0.05)
+
     non_anch.sort(key=lambda x: x["score"], reverse=True)
     pois = (anchors + non_anch)[:top_k]
 
@@ -850,6 +859,45 @@ function toggleForm() {
   }
 }
 
+// ── Start Location Functions ──────────────────────────
+function detectLocation() {
+  if (!navigator.geolocation) { alert('Trình duyệt không hỗ trợ định vị.'); return; }
+  const badge = document.getElementById('sl-badge');
+  badge.textContent = '📡 Đang xác định vị trí...';
+  navigator.geolocation.getCurrentPosition(
+    pos => setStartLocation(pos.coords.latitude, pos.coords.longitude, '📡 Vị trí của tôi'),
+    err => { badge.textContent = '🏔 Mặc định: Trung tâm Đà Lạt'; alert('Không lấy được vị trí: ' + err.message); },
+    { timeout: 8000 }
+  );
+}
+
+function pickOnMap() {
+  pickingStartLocation = true;
+  document.getElementById('sl-badge').textContent = '🖱 Bấm vào bản đồ để chọn điểm xuất phát...';
+  map.getContainer().style.cursor = 'crosshair';
+}
+
+function setStartLocation(lat, lng, label) {
+  startLocation = { lat, lng };
+  document.getElementById('sl-badge').innerHTML = '📍 ' + label + ' (' + lat.toFixed(4) + ', ' + lng.toFixed(4) + ')';
+  document.getElementById('sl-clear').style.display = 'block';
+  if (startMarker) map.removeLayer(startMarker);
+  const icon = L.divIcon({
+    className: '',
+    html: '<div style="background:#d4b87a;color:#0a0c12;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);">🏁</div>',
+    iconSize:[28,28], iconAnchor:[14,14]
+  });
+  startMarker = L.marker([lat, lng], {icon}).bindPopup('📍 Điểm xuất phát').addTo(map);
+  map.setView([lat, lng], 15);
+}
+
+function clearStartLocation() {
+  startLocation = null;
+  document.getElementById('sl-badge').textContent = '🏔 Mặc định: Trung tâm Đà Lạt';
+  document.getElementById('sl-clear').style.display = 'none';
+  if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
+}
+
 fetch('/api/poi_types').then(r=>r.json()).then(types => {
   const container = document.getElementById('type-filters');
   types.forEach(t => {
@@ -995,7 +1043,7 @@ function renderResult(data) {
       const latlng = [stop.lat, stop.lng];
       coords.push(latlng);
       bounds.push(latlng);
-      const icon = L.divIcon({ html: `<div style="background:${day.color};color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);opacity:${stop.feasible?1:0.4};">${stop.idx}</div>`, iconSize:[26,26], iconAnchor:[13,13] });
+      const icon = L.divIcon({ className: '', html: `<div style="background:${day.color};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);opacity:${stop.feasible?1:0.4};">${stop.idx}</div>`, iconSize:[28,28], iconAnchor:[14,14] });
       const popupHtml = `<div class="map-popup"><b>${stop.name}</b><br><div class="meta">${stop.emoji} ${stop.type_vi} | Ngày ${day.day} #${stop.idx}</div>🕐 ${stop.start}–${stop.end} ${stop.feasible?'✅':'⚠️'}<br>${stop.rating?`⭐ ${stop.rating}`:''} ${stop.address?`<br>📍 ${stop.address}`:''}${stop.video_url?`<br><a href="${stop.video_url}" target="_blank">🎬 TikTok</a>`:''}</div>`;
       const marker = L.marker(latlng, {icon}).bindPopup(popupHtml, {maxWidth:280}).addTo(map);
       allLayers.push(marker);
