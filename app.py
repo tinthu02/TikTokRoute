@@ -195,7 +195,11 @@ def get_user_weight(user_id, category):
 
     return 0
 
+<<<<<<< HEAD
 def greedy(pois, user_start, user_end):
+=======
+def greedy(pois, user_start, user_end, start_lat=None, start_lng=None):
+>>>>>>> origin/main
     unvisited = list(pois); route = []
     cur_lat = start_lat if start_lat else DALAT_CENTER[0]
     cur_lng = start_lng if start_lng else DALAT_CENTER[1]
@@ -394,7 +398,11 @@ def feedback():
     if row:
         old_weight = row[0]
 
+<<<<<<< HEAD
         new_weight = min(1.0, max(0.0, old_weight + (rating / 5 - 0.5) * 0.1))
+=======
+        new_weight = old_weight + (rating / 5) * 0.1
+>>>>>>> origin/main
 
         cursor.execute("""
             UPDATE preferences
@@ -417,7 +425,10 @@ def feedback():
         "message": "feedback saved",
         "new_weight": new_weight
     })
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/main
 # ══════════════════════════════════════════════════════════════
 # HTML TEMPLATE (anchor input đồng bộ)
 # ══════════════════════════════════════════════════════════════
