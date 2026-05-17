@@ -140,9 +140,10 @@ def is_feasible(poi, arrive, user_end):
     end = start + poi["visit_min"]
     return (end <= poi["close_min"] and end <= user_end), start, end
 
-def simulate_day(poi_list, user_start, user_end):
+def simulate_day(poi_list, user_start, user_end, start_lat=None, start_lng=None):
     cur_time = user_start
-    cur_lat, cur_lng = DALAT_CENTER
+    cur_lat = start_lat if start_lat else DALAT_CENTER[0]
+    cur_lng = start_lng if start_lng else DALAT_CENTER[1]
     total_km = 0.0
     feasible = 0
     timeline = []
@@ -159,16 +160,18 @@ def simulate_day(poi_list, user_start, user_end):
     return total_km, feasible, sorted(timeline, key=lambda x: x["start"])
 
 def split_days(route, num_days):
-    sorted_route = sorted(route, key=lambda p: p["lat"])
+    # sorted_route = sorted(route, key=lambda p: p["lat"])
+    # Giữ nguyên thứ tự từ SA optimizer thay vì sort theo lat
+    sorted_route = route
     n=len(sorted_route); days=[]; size=n//num_days; rem=n%num_days; idx=0
     for d in range(num_days):
         end=idx+size+(1 if d<rem else 0); days.append(sorted_route[idx:end]); idx=end
     return days
 
-def route_cost(route, num_days, user_start, user_end):
+def route_cost(route, num_days, user_start, user_end, start_lat=None, start_lng=None):
     total_km=0; total_inf=0
     for day_pois in split_days(route, num_days):
-        km, feas, _ = simulate_day(day_pois, user_start, user_end)
+        km, feas, _ = simulate_day(day_pois, user_start, user_end, start_lat, start_lng)
         total_km += km; total_inf += len(day_pois)-feas
     return total_km + total_inf*50
 
@@ -194,7 +197,9 @@ def get_user_weight(user_id, category):
 
 def greedy(pois, user_start, user_end):
     unvisited = list(pois); route = []
-    cur_lat, cur_lng = DALAT_CENTER; cur_time = user_start
+    cur_lat = start_lat if start_lat else DALAT_CENTER[0]
+    cur_lng = start_lng if start_lng else DALAT_CENTER[1]
+    cur_time = user_start
     while unvisited:
         best=None; best_val=-1
         for p in unvisited:
@@ -214,11 +219,11 @@ def greedy(pois, user_start, user_end):
         unvisited.remove(best)
     return route
 
-def simulated_annealing(initial, num_days, user_start, user_end, T0=800, alpha=0.995, max_iter=30000, anchor_names=None):
+def simulated_annealing(initial, num_days, user_start, user_end, T0=800, alpha=0.995, max_iter=30000, anchor_names=None, start_lat=None, start_lng=None):
     anchor_names = anchor_names or []
     random.seed(42)
     current=list(initial); best=list(current)
-    cur_cost=route_cost(current,num_days,user_start,user_end)
+    cur_cost=route_cost(current,num_days,user_start,user_end,start_lat,start_lng)
     best_cost=cur_cost; T=T0
     for _ in range(max_iter):
         if T<0.01: break
@@ -238,7 +243,7 @@ def simulated_annealing(initial, num_days, user_start, user_end, T0=800, alpha=0
             if anchor_names and any(a in poi["name"].lower() for a in anchor_names):
                 T*=alpha; continue
             nb.pop(i); nb.insert(j,poi)
-        nc=route_cost(nb,num_days,user_start,user_end)
+        nc=route_cost(nb,num_days,user_start,user_end,start_lat,start_lng)
         delta=nc-cur_cost
         if delta<0 or random.random()<math.exp(-delta/T):
             current=nb; cur_cost=nc
@@ -264,6 +269,11 @@ def optimize():
     types_filter = data.get("types", [])
     preferences = data.get("preferences", {})
     anchor_names = [a.strip().lower() for a in data.get("anchor_pois", []) if a.strip()]
+
+    # Điểm xuất phát tùy chọn
+    start_loc  = data.get("start_location", None)
+    start_lat  = float(start_loc["lat"]) if start_loc else None
+    start_lng  = float(start_loc["lng"]) if start_loc else None
 
     rainy_days = get_rainy_days(num_days)
     print(f"Dự báo thời tiết {num_days} ngày: {rainy_days}")
@@ -295,6 +305,13 @@ def optimize():
 
     anchors = [p for p in filtered if p["anchor"]]
     non_anch = [p for p in filtered if not p["anchor"]]
+
+    # Giảm score theo khoảng cách từ điểm xuất phát (nếu có)
+    if start_lat and start_lng:
+        for p in non_anch:
+            dist = haversine_km(start_lat, start_lng, p["lat"], p["lng"])
+            p["score"] = p["score"] / (1 + dist * 0.05)
+
     non_anch.sort(key=lambda x: x["score"], reverse=True)
     pois = (anchors + non_anch)[:top_k]
 
@@ -303,13 +320,13 @@ def optimize():
         pois = [p for p in pois if p['type'] not in OUTDOOR_TYPES]
         print(f"  Do dự báo mưa, đã loại {original_count - len(pois)} POI ngoài trời")
 
-    g_route = greedy(pois, user_start, user_end)
-    sa_route = simulated_annealing(g_route, num_days, user_start, user_end, anchor_names=anchor_names)
+    g_route = greedy(pois, user_start, user_end, start_lat, start_lng)
+    sa_route = simulated_annealing(g_route, num_days, user_start, user_end, anchor_names=anchor_names, start_lat=start_lat, start_lng=start_lng)
 
     days_data = []
     total_km=0; total_feas=0; total_stops=0
     for d, day_pois in enumerate(split_days(sa_route, num_days), 1):
-        km, feas, timeline = simulate_day(day_pois, user_start, user_end)
+        km, feas, timeline = simulate_day(day_pois, user_start, user_end, start_lat if d==1 else None, start_lng if d==1 else None)
         total_km+=km; total_feas+=feas; total_stops+=len(day_pois)
         color = DAY_COLORS[(d-1) % len(DAY_COLORS)]
         stops = []
@@ -330,6 +347,7 @@ def optimize():
             "total_km": round(total_km,1), "feasible": total_feas, "total_stops": total_stops,
             "rate": round(total_feas/total_stops*100) if total_stops else 0, "num_days": num_days,
             "anchors": [p["name"] for p in pois if p["anchor"]],
+        "start_location": start_loc,
         },
         "weather": {
             "rainy_days": rainy_days,
@@ -399,6 +417,7 @@ def feedback():
         "message": "feedback saved",
         "new_weight": new_weight
     })
+
 # ══════════════════════════════════════════════════════════════
 # HTML TEMPLATE (anchor input đồng bộ)
 # ══════════════════════════════════════════════════════════════
@@ -616,6 +635,28 @@ body {
 .anchor-tag button:hover {
   color: #ff5e5e;
 }
+#start-location-section {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+#start-location-section .sl-row {
+  display: flex; gap: 8px; align-items: center; margin-top: 6px;
+}
+#start-location-section .sl-badge {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--accent);
+  background: rgba(212,184,122,0.1); border: 1px solid var(--accent);
+  border-radius: 6px; padding: 3px 8px; flex: 1;
+}
+#start-location-section .sl-btn {
+  background: var(--surface-light); border: 1px solid var(--border);
+  color: var(--text-muted); border-radius: 6px; padding: 4px 8px;
+  font-size: 11px; cursor: pointer; white-space: nowrap;
+}
+#start-location-section .sl-btn:hover { border-color: var(--accent); color: var(--accent); }
 #btn-optimize {
   width: 100%;
   background: linear-gradient(135deg, var(--accent), var(--accent-dark));
@@ -756,6 +797,15 @@ body {
         </div>
         <div id="anchor-tags" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;"></div>
       </div>
+      <div id="start-location-section">
+        <label>📍 Điểm xuất phát</label>
+        <div class="sl-row">
+          <div class="sl-badge" id="sl-badge">🏔 Mặc định: Trung tâm Đà Lạt</div>
+          <button class="sl-btn" onclick="detectLocation()">📡 Vị trí của tôi</button>
+          <button class="sl-btn" onclick="pickOnMap()">🗺 Chọn trên bản đồ</button>
+          <button class="sl-btn" id="sl-clear" onclick="clearStartLocation()" style="display:none; color:#ff5e5e;">✕</button>
+        </div>
+      </div>
       <button id="btn-optimize" onclick="optimize()">🗺 Tối ưu lộ trình</button>
     </div>
   </div>
@@ -782,9 +832,20 @@ const map = L.map('map', { zoomControl: false }).setView([11.9404, 108.4583], 13
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB', maxZoom: 19 }).addTo(map);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+// Click bản đồ để chọn điểm xuất phát
+map.on('click', function(e) {
+  if (!pickingStartLocation) return;
+  pickingStartLocation = false;
+  map.getContainer().style.cursor = '';
+  setStartLocation(e.latlng.lat, e.latlng.lng, 'Điểm chọn trên bản đồ');
+});
+
 let allLayers = [];
 let selectedTypes = new Set();
 let anchorPOIs = [];
+let startLocation = null;      // {lat, lng} hoặc null
+let pickingStartLocation = false;
+let startMarker = null;
 
 // Toggle form
 function toggleForm() {
@@ -797,6 +858,45 @@ function toggleForm() {
     formSection.classList.add('collapsed');
     btn.innerHTML = '▼ Mở rộng';
   }
+}
+
+// ── Start Location Functions ──────────────────────────
+function detectLocation() {
+  if (!navigator.geolocation) { alert('Trình duyệt không hỗ trợ định vị.'); return; }
+  const badge = document.getElementById('sl-badge');
+  badge.textContent = '📡 Đang xác định vị trí...';
+  navigator.geolocation.getCurrentPosition(
+    pos => setStartLocation(pos.coords.latitude, pos.coords.longitude, '📡 Vị trí của tôi'),
+    err => { badge.textContent = '🏔 Mặc định: Trung tâm Đà Lạt'; alert('Không lấy được vị trí: ' + err.message); },
+    { timeout: 8000 }
+  );
+}
+
+function pickOnMap() {
+  pickingStartLocation = true;
+  document.getElementById('sl-badge').textContent = '🖱 Bấm vào bản đồ để chọn điểm xuất phát...';
+  map.getContainer().style.cursor = 'crosshair';
+}
+
+function setStartLocation(lat, lng, label) {
+  startLocation = { lat, lng };
+  document.getElementById('sl-badge').innerHTML = '📍 ' + label + ' (' + lat.toFixed(4) + ', ' + lng.toFixed(4) + ')';
+  document.getElementById('sl-clear').style.display = 'block';
+  if (startMarker) map.removeLayer(startMarker);
+  const icon = L.divIcon({
+    className: '',
+    html: '<div style="background:#d4b87a;color:#0a0c12;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);">🏁</div>',
+    iconSize:[28,28], iconAnchor:[14,14]
+  });
+  startMarker = L.marker([lat, lng], {icon}).bindPopup('📍 Điểm xuất phát').addTo(map);
+  map.setView([lat, lng], 15);
+}
+
+function clearStartLocation() {
+  startLocation = null;
+  document.getElementById('sl-badge').textContent = '🏔 Mặc định: Trung tâm Đà Lạt';
+  document.getElementById('sl-clear').style.display = 'none';
+  if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
 }
 
 fetch('/api/poi_types').then(r=>r.json()).then(types => {
@@ -877,6 +977,7 @@ async function optimize() {
     types: [...selectedTypes],
     anchor_pois: anchorPOIs.map(a=>a.name),
     preferences: preferences,
+    start_location: startLocation,
   };
   try {
     const res = await fetch('/api/optimize', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
@@ -943,7 +1044,7 @@ function renderResult(data) {
       const latlng = [stop.lat, stop.lng];
       coords.push(latlng);
       bounds.push(latlng);
-      const icon = L.divIcon({ html: `<div style="background:${day.color};color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);opacity:${stop.feasible?1:0.4};">${stop.idx}</div>`, iconSize:[26,26], iconAnchor:[13,13] });
+      const icon = L.divIcon({ className: '', html: `<div style="background:${day.color};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);opacity:${stop.feasible?1:0.4};">${stop.idx}</div>`, iconSize:[28,28], iconAnchor:[14,14] });
       const popupHtml = `<div class="map-popup"><b>${stop.name}</b><br><div class="meta">${stop.emoji} ${stop.type_vi} | Ngày ${day.day} #${stop.idx}</div>🕐 ${stop.start}–${stop.end} ${stop.feasible?'✅':'⚠️'}<br>${stop.rating?`⭐ ${stop.rating}`:''} ${stop.address?`<br>📍 ${stop.address}`:''}${stop.video_url?`<br><a href="${stop.video_url}" target="_blank">🎬 TikTok</a>`:''}</div>`;
       const marker = L.marker(latlng, {icon}).bindPopup(popupHtml, {maxWidth:280}).addTo(map);
       allLayers.push(marker);
@@ -954,6 +1055,9 @@ function renderResult(data) {
     }
   });
   if (bounds.length) map.fitBounds(bounds, {padding:[40,40]});
+
+  // Giữ lại marker điểm xuất phát nếu có
+  if (startMarker) startMarker.addTo(map);
 
   const weatherBanner = document.getElementById('weather-banner');
   if (data.weather && data.weather.outdoor_removed) {
