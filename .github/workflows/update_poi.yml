@@ -1,0 +1,40 @@
+name: Weekly POI Update
+
+on:
+  schedule:
+    # Chạy vào lúc 2:00 sáng Chủ Nhật hàng tuần (UTC)
+    - cron: '0 2 * * 0'
+  workflow_dispatch:   # Cho phép chạy thủ công từ GitHub UI
+
+jobs:
+  update-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run full pipeline
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          GMAPS_API_KEY: ${{ secrets.GMAPS_API_KEY }}
+          WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
+        run: |
+          python full_pipeline.py
+
+      - name: Commit and push updated files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-update: POI and routes $(date +'%Y-%m-%d')"
+          git push

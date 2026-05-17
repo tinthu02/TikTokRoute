@@ -1,25 +1,24 @@
 """
 =============================================================
-GIAI ĐOẠN 5 — Tối ưu lộ trình du lịch Đà Lạt (phiên bản ổn định)
+GIAI ĐOẠN 5 — Tối ưu lộ trình du lịch Đà Lạt (có tích hợp thời tiết)
 =============================================================
 - Dedup theo gmaps_place_id
 - K-Means 3D (lat, lng, open_min)
 - SA 2-phase: phase1 chỉ feasibility, phase2 hard constraint trên feasibility
-
-INPUT_CSV = 'dalat_poi_scored_fix.csv', sử dụng K-Means 3D (lat,lng,open_min), 
-SA 2-phase (phase1 tối ưu feasibility, phase2 hard constraint giữ nguyên infeasible), 
-xuất ra dalat_route_3days.csv
+- Tích hợp dự báo thời tiết: nếu ngày mưa, loại bỏ các POI ngoài trời
 =============================================================
 """
 
 import csv, math, random, time, copy
 import numpy as np
+from weather import get_rainy_days  # thêm dòng này
+import argparse
 
 # ══════════════════════════════════════════════════════════════
 # CẤU HÌNH
 # ══════════════════════════════════════════════════════════════
 
-INPUT_CSV   = "dalat_poi_scored_fix.csv"   # thay vì "dalat_poi_scored.csv"
+INPUT_CSV   = "dalat_poi_scored_fix.csv"
 NUM_DAYS    = 3
 TOP_K       = 40
 ANCHOR_POIS: list[str] = []
@@ -42,6 +41,9 @@ MEAL_WINDOWS = [(11*60+30, 13*60), (18*60, 19*60+30)]
 MEAL_BONUS = 100.0
 TYPE_DIVERSITY_WEIGHT = 150.0
 FOOD_TYPES = {"chợ quán", "nhà hàng", "quán ăn", "ăn_uống"}
+
+# Các loại POI ngoài trời (sẽ bị loại nếu trời mưa)
+OUTDOOR_TYPES = {"thiên nhiên", "địa điểm checkin"}  # check-in thường ngoài trời
 
 DEFAULT_HOURS_BY_TYPE = {
     "thiên nhiên":      (7*60,  18*60),
@@ -90,7 +92,7 @@ DALAT_LAT = 11.9404
 DALAT_LNG = 108.4583
 
 # ══════════════════════════════════════════════════════════════
-# VISIT DURATION
+# VISIT DURATION (giữ nguyên)
 # ══════════════════════════════════════════════════════════════
 
 _BASE_DURATION = {
@@ -188,6 +190,14 @@ def load_pois(filepath, top_k, num_days):
             "anchor":           False,
         })
 
+    # Lấy dự báo thời tiết
+    rainy_days = get_rainy_days(num_days)
+    print(f"  Dự báo thời tiết {num_days} ngày tới: {rainy_days}")
+
+    # Lọc POI theo thời tiết (nếu ngày mưa, loại bỏ POI ngoài trời)
+    # Việc lọc này sẽ được áp dụng khi phân cụm ngày (sau khi đã có clusters)
+    # Ở đây ta chỉ lưu lại thông tin rainy_days để dùng sau.
+
     pois.sort(key=lambda x: x["attraction_score"], reverse=True)
     k = max(top_k, num_days * 5)
 
@@ -205,10 +215,10 @@ def load_pois(filepath, top_k, num_days):
     else:
         print(f"  Không có anchor — chạy tự động")
     print(f"  Chọn {len(selected)} POI (đã dedup)")
-    return selected
+    return selected, rainy_days
 
 # ══════════════════════════════════════════════════════════════
-# SIMULATE NGÀY
+# SIMULATE NGÀY (giữ nguyên)
 # ══════════════════════════════════════════════════════════════
 
 def is_feasible(poi, arrive_time):
@@ -260,7 +270,7 @@ def count_infeasible(itinerary):
     return total
 
 # ══════════════════════════════════════════════════════════════
-# K-MEANS 3D (lat, lng, open_min)
+# K-MEANS 3D (lat, lng, open_min) - có lọc outdoor khi mưa
 # ══════════════════════════════════════════════════════════════
 
 def kmeans_cluster_3d(pois, num_clusters, max_iter=50):
@@ -299,9 +309,23 @@ def kmeans_cluster_3d(pois, num_clusters, max_iter=50):
         clusters[label].append(i)
     return clusters
 
-# ══════════════════════════════════════════════════════════════
-# GREEDY NỘI BỘ
-# ══════════════════════════════════════════════════════════════
+def initial_itinerary(pois, num_days, rainy_days):
+    # Lọc POI theo thời tiết: nếu ngày dự báo mưa, loại bỏ các POI outdoor
+    # Ta sẽ tạo một bản sao pois_filtered cho từng ngày dựa trên rainy_days
+    # Tuy nhiên, để đơn giản, ta sẽ lọc cứng trong chính hàm greedy_day
+    # Ở đây ta sẽ gắn thêm thuộc tính "is_outdoor" cho mỗi POI
+    for p in pois:
+        p["is_outdoor"] = p["type"] in OUTDOOR_TYPES
+
+    clusters = kmeans_cluster_3d(pois, num_days)
+    itinerary = []
+    for day_idx, idxs in enumerate(clusters):
+        day_pois = [pois[i] for i in idxs]
+        # Nếu ngày này mưa, loại bỏ các POI outdoor khỏi danh sách ngày
+        if rainy_days[day_idx]:
+            day_pois = [p for p in day_pois if not p["is_outdoor"]]
+        itinerary.append(greedy_day(day_pois))
+    return itinerary
 
 def greedy_day(poi_list):
     if not poi_list:
@@ -336,16 +360,8 @@ def greedy_day(poi_list):
         unvisited.remove(best)
     return route
 
-def initial_itinerary(pois, num_days):
-    clusters = kmeans_cluster_3d(pois, num_days)
-    itinerary = []
-    for idxs in clusters:
-        day_pois = [pois[i] for i in idxs]
-        itinerary.append(greedy_day(day_pois))
-    return itinerary
-
 # ══════════════════════════════════════════════════════════════
-# COST FUNCTIONS
+# COST FUNCTIONS (giữ nguyên)
 # ══════════════════════════════════════════════════════════════
 
 def cost_phase1(itinerary):
@@ -512,7 +528,7 @@ def sa_phase2(init_itin, target_infeas):
     return best, best_cost
 
 # ══════════════════════════════════════════════════════════════
-# LƯU VÀ IN KẾT QUẢ
+# LƯU VÀ IN KẾT QUẢ (giữ nguyên)
 # ══════════════════════════════════════════════════════════════
 
 def save_route(itinerary, filepath, method):
@@ -559,26 +575,38 @@ def print_route(itinerary, title):
             status = "✅" if stop["feasible"] else "⚠️"
             print(f"    {status} {fmt_min(stop['start'])}-{fmt_min(stop['end'])}  {stop['name'][:30]:<30} ({stop['type'][:12]}) ⭐{stop['rating']}")
 
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Route Optimizer for Da Lat')
+    parser.add_argument('--num_days', type=int, default=NUM_DAYS, help='Number of days')
+    parser.add_argument('--top_k', type=int, default=TOP_K, help='Number of POIs')
+    parser.add_argument('--anchor_pois', type=str, nargs='*', default=ANCHOR_POIS, help='Anchor POI names')
+    return parser.parse_args()
 # ══════════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════════
 
 def main():
+    args = parse_args()
+    global NUM_DAYS, TOP_K, ANCHOR_POIS
+    NUM_DAYS = args.num_days
+    TOP_K = args.top_k
+    ANCHOR_POIS = args.anchor_pois
     random.seed(42)
     np.random.seed(42)
     t_start = time.time()
 
     print("\n" + "="*60)
-    print(f"  ROUTE OPTIMIZER — {NUM_DAYS} ngày, Top {TOP_K} POI")
+    print(f"  ROUTE OPTIMIZER — {NUM_DAYS} ngày, Top {TOP_K} POI (có thời tiết)")
     print(f"  Giờ: {fmt_min(USER_START)} - {fmt_min(USER_END)}")
     print(f"  SA 2-phase (hard constraint)")
     print("="*60)
 
-    print("\nBước 1: Load POI...")
-    pois = load_pois(INPUT_CSV, TOP_K, NUM_DAYS)
+    print("\nBước 1: Load POI và dự báo thời tiết...")
+    pois, rainy_days = load_pois(INPUT_CSV, TOP_K, NUM_DAYS)
 
-    print("\nBước 2: Khởi tạo K-Means 3D + Greedy...")
-    init_itin = initial_itinerary(pois, NUM_DAYS)
+    print("\nBước 2: Khởi tạo K-Means 3D + Greedy (có lọc outdoor khi mưa)...")
+    init_itin = initial_itinerary(pois, NUM_DAYS, rainy_days)
     save_route(init_itin, "dalat_route_greedy_3d.csv", "Greedy 3D")
     print_route(init_itin, "Greedy (K-Means 3D)")
 
@@ -593,9 +621,7 @@ def main():
     km_final, feas_final, stops_final = save_route(final_itin, f"dalat_route_{NUM_DAYS}days.csv", "SA_Phase2")
     print_route(final_itin, "SA 2-phase")
 
-    km_init, feas_init, stops_init = simulate_day(init_itin[0])[0], sum(1 for d in init_itin for _ in d), sum(len(d) for d in init_itin)  # quick
-    # Actually get from saved data: we recompute
-    km_greedy, feas_greedy, _ = save_route(init_itin, "temp.csv", "temp")  # dummy
+    km_greedy, feas_greedy, _ = save_route(init_itin, "temp.csv", "temp")
     import os; os.remove("temp.csv")
     print(f"\n  {'='*60}")
     print(f"  SO SÁNH")
@@ -606,7 +632,13 @@ def main():
     feas_imp = (feas_final - feas_greedy)/stops_final*100
     print(f"  {'Tổng km':<30} {km_greedy:>12.1f} {km_final:>12.1f} {km_imp:>+11.1f}%")
     print(f"  {'Feasible stops':<30} {feas_greedy:>12} {feas_final:>12} {feas_imp:>+11.1f}%")
-    print(f"  {'Feasibility rate':<30} {round(100*feas_greedy/stops_init):>11}% {round(100*feas_final/stops_final):>11}%")
+    #print(f"  {'Feasibility rate':<30} {round(100*feas_greedy/len(init_itin[0]) if init_itin else 0):>11}% {round(100*feas_final/stops_final):>11}%")
+    greedy_total_stops = sum(len(day) for day in init_itin) if init_itin else 0
+    if greedy_total_stops == 0:
+        greedy_rate = 0
+    else:
+        greedy_rate = round(100 * feas_greedy / greedy_total_stops)
+    print(f"  {'Feasibility rate':<30} {greedy_rate:>11}% {round(100*feas_final/stops_final):>11}%")
     print(f"\n  Thời gian: {time.time()-t_start:.1f}s")
     print(f"  Output: dalat_route_{NUM_DAYS}days.csv")
     print("="*60)

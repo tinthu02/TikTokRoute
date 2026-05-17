@@ -1,0 +1,35 @@
+=============================================================
+BÁO CÁO PHÂN TÍCH DỮ LIỆU ĐÀ LẠT (EDA)
+Thời gian chạy: 2026-05-18 00:41:31
+=============================================================
+
+1. TỔNG QUAN DỮ LIỆU
+- Số POI sau clean: 186
+- Số video TikTok thu thập: 887
+- Số POI có Google Maps rating: 108
+
+2. PHÂN PHỐI LOẠI POI
+- cafe: 73 POI (39.2%)
+- địa điểm checkin: 41 POI (22.0%)
+- chợ quán: 27 POI (14.5%)
+- homestay: 13 POI (7.0%)
+- thiên nhiên: 11 POI (5.9%)
+- khác: 9 POI (4.8%)
+- khách sạn: 4 POI (2.2%)
+- nhà hàng: 3 POI (1.6%)
+- quán ăn: 2 POI (1.1%)
+- quán com: 1 POI (0.5%)
+- cà phê : 1 POI (0.5%)
+- quán nướng : 1 POI (0.5%)
+
+3. TƯƠNG QUAN NỔI BẬT
+- Hệ số tương quan giữa total_digg và gmaps_rating: -0.009
+- Nhận xét: TikTok viral và Google rating có tương quan yếu (không nhất thiết quán nổi trên TikTok được đánh giá cao trên Maps).
+
+4. TOP HASHTAG
+Không có dữ liệu hashtag.
+
+5. INSIGHTS CHÍNH
+- Thác Datanla là địa điểm được nhắc nhiều nhất TikTok (16 video).
+- Al Dente có Google rating cao nhất (5.0⭐).
+- Loại hình phổ biến nhất: cafe chiếm 39.2%.

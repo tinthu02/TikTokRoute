@@ -1,0 +1,57 @@
+=============================================================
+BÁO CÁO INSIGHTS DỮ LIỆU TIKTOK ĐÀ LẠT
+Thời gian: 2026-05-18 02:05:00
+=============================================================
+
+1. PHÂN PHỐI LOẠI ĐỊA ĐIỂM
+- cafe: 73 POI (39.2%)
+- địa điểm checkin: 41 POI (22.0%)
+- chợ quán: 27 POI (14.5%)
+- homestay: 13 POI (7.0%)
+- thiên nhiên: 11 POI (5.9%)
+- khác: 9 POI (4.8%)
+- khách sạn: 4 POI (2.2%)
+- nhà hàng: 3 POI (1.6%)
+- quán ăn: 2 POI (1.1%)
+- quán com: 1 POI (0.5%)
+- cà phê : 1 POI (0.5%)
+- quán nướng : 1 POI (0.5%)
+
+=> Cafe là loại phổ biến nhất (39.2%), phản ánh nhu cầu thư giãn và check-in của du khách.
+
+2. HASHTAG PHỔ BIẾN
+
+3. TỪ KHÓA TRONG MÔ TẢ (TOP 10)
+- dalat: 518 lần
+- quán: 137 lần
+- dalatreview: 121 lần
+- reviewdalat: 120 lần
+- xuhuong: 101 lần
+- cafe: 86 lần
+- ngon: 74 lần
+- chill: 72 lần
+- vietnam: 68 lần
+- dalattrip: 68 lần
+
+4. PHÂN TÍCH CHỦ ĐỀ
+- Ẩm thực: 878 lượt nhắc (48.5%)
+- Check-in / Cảnh đẹp: 725 lượt nhắc (40.0%)
+- Lưu trú: 136 lượt nhắc (7.5%)
+- Trải nghiệm: 72 lượt nhắc (4.0%)
+
+5. XU HƯỚNG THEO THỜI GIAN
+- Tháng có nhiều video nhất: 2026-05 với 149 video
+- Tháng có tổng lượt thích cao nhất: 2026-04 với 1,378,903 lượt
+
+6. TOP VIDEO TƯƠNG TÁC
+Top 5 video có lượt xem cao nhất:
+- Video 7.591076936839892e+18: 14,300,000.0 lượt xem (likes: 305,500.0)
+- Video 7.322449953807191e+18: 10,000,000.0 lượt xem (likes: 528,100.0)
+- Video 7.357193741779652e+18: 7,500,000.0 lượt xem (likes: 140,500.0)
+- Video 7.617339150563429e+18: 6,900,000.0 lượt xem (likes: 218,600.0)
+- Video 7.572962874641894e+18: 6,300,000.0 lượt xem (likes: 202,100.0)
+
+7. TRẢI NGHIỆM SĂN MÂY
+- Số video: 21
+- Tổng lượt xem: 19,715,378
+- Tổng lượt thích: 765,870
