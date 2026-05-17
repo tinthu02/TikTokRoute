@@ -376,7 +376,7 @@ def feedback():
     if row:
         old_weight = row[0]
 
-        new_weight = old_weight + (rating / 5) * 0.1
+        new_weight = min(1.0, max(0.0, old_weight + (rating / 5 - 0.5) * 0.1))
 
         cursor.execute("""
             UPDATE preferences
