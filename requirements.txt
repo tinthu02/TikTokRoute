@@ -1,0 +1,7 @@
+apify-client
+python-dotenv
+requests
+rapidfuzz
+numpy
+folium
+flask
