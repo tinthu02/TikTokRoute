@@ -195,11 +195,7 @@ def get_user_weight(user_id, category):
 
     return 0
 
-<<<<<<< HEAD
 def greedy(pois, user_start, user_end):
-=======
-def greedy(pois, user_start, user_end, start_lat=None, start_lng=None):
->>>>>>> origin/main
     unvisited = list(pois); route = []
     cur_lat = start_lat if start_lat else DALAT_CENTER[0]
     cur_lng = start_lng if start_lng else DALAT_CENTER[1]
@@ -398,11 +394,7 @@ def feedback():
     if row:
         old_weight = row[0]
 
-<<<<<<< HEAD
         new_weight = min(1.0, max(0.0, old_weight + (rating / 5 - 0.5) * 0.1))
-=======
-        new_weight = old_weight + (rating / 5) * 0.1
->>>>>>> origin/main
 
         cursor.execute("""
             UPDATE preferences
@@ -425,10 +417,6 @@ def feedback():
         "message": "feedback saved",
         "new_weight": new_weight
     })
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/main
 # ══════════════════════════════════════════════════════════════
 # HTML TEMPLATE (anchor input đồng bộ)
 # ══════════════════════════════════════════════════════════════
@@ -475,6 +463,9 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   z-index: 10;
 }
 /* Header có nút toggle */
@@ -505,6 +496,13 @@ body {
   cursor: pointer;
   transition: 0.2s;
 }
+<<<<<<< HEAD
+input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+
+#type-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+#interest-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.section-title { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 8px; margin-bottom: 8px; }
+=======
 .toggle-form-btn:hover {
   background: var(--accent);
   color: #0a0c12;
@@ -555,6 +553,7 @@ body {
 }
 /* Type filters & preferences */
 #type-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+>>>>>>> origin/main
 .type-pill {
   background: var(--bg);
   border: 1px solid var(--border);
@@ -739,8 +738,15 @@ body {
   padding: 8px 20px 8px 36px;
   cursor: pointer;
   border-left: 3px solid transparent;
+  transition: 0.25s;
+  border: 1px solid rgba(255,255,255,0.05);
 }
-.stop-item:hover { background: rgba(255,255,255,0.03); }
+.stop-item:hover {
+  transform: translateX(8px);
+  background: rgba(255,255,255,0.05);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+
 .stop-num {
   width: 24px; height: 24px;
   border-radius: 50%;
@@ -751,8 +757,38 @@ body {
   font-weight: 700;
   color: white;
 }
+<<<<<<< HEAD
+.stop-body { flex: 1; min-width: 0; }
+.stop-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stop-meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .map-popup {
+    background: rgba(20,20,25,0.92);
+    color: white;
+    border-radius: 14px;
+    padding: 10px;
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+  }
+
+  .map-popup b {
+    font-size: 15px;
+    color: #f0d79a;
+  }
+
+  .map-popup .meta {
+    opacity: 0.75;
+    margin: 4px 0;
+    font-size: 12px;
+  }
+.stop-time { color: var(--accent); font-weight: 500; }
+.badge-infeasible { background: rgba(255,94,94,0.15); color: #ff5e5e; padding: 2px 8px; border-radius: 20px; font-size: 10px; }
+.badge-anchor { background: rgba(212,184,122,0.15); color: var(--accent); padding: 2px 8px; border-radius: 20px; font-size: 10px; }
+
+=======
 .stop-name { font-size: 13px; font-weight: 500; }
 .stop-meta { font-size: 10px; color: var(--text-muted); display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+>>>>>>> origin/main
 #map-container { flex: 1; position: relative; }
 #map { width: 100%; height: 100%; }
 #loading {
@@ -819,6 +855,28 @@ body {
       </div>
       <button id="btn-optimize" onclick="optimize()">🗺 Tối ưu lộ trình</button>
     </div>
+<<<<<<< HEAD
+    <div class="form-row">
+      <div class="form-group"><label>Bắt đầu lúc</label><select id="start_hour"><option value="6">06:00</option><option value="7" selected>07:00</option><option value="8">08:00</option><option value="9">09:00</option></select></div>
+      <div class="form-group"><label>Kết thúc lúc</label><select id="end_hour"><option value="19">19:00</option><option value="20">20:00</option><option value="21" selected>21:00</option><option value="22">22:00</option></select></div>
+    </div>
+    <label>Loại địa điểm</label>
+    <div id="type-filters"><div class="type-pill active" data-type="all">✨ Tất cả</div></div>
+    <div class="section-title">Phong cách du lịch</div>
+    <div id="interest-filters">
+      <div class="type-pill">🌿 Chill</div>
+      <div class="type-pill">📸 Sống ảo</div>
+      <div class="type-pill">🌄 Săn mây</div>
+      <div class="type-pill">🌙 View đêm</div>
+    </div>
+    <label>📌 Điểm bắt buộc</label>
+    <div id="anchor-section">
+      <div style="position:relative;"><input type="text" id="anchor-input" placeholder="Tìm địa điểm..." autocomplete="off"><div id="anchor-drop" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--surface); border:1px solid var(--border); border-radius:12px; max-height:200px; overflow-y:auto; z-index:100; margin-top:4px;"></div></div>
+      <div id="anchor-tags" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+    </div>
+    <button id="btn-optimize" onclick="optimize()">🗺 Tối ưu lộ trình</button>
+=======
+>>>>>>> origin/main
   </div>
 
   <div id="summary-bar" style="display:none;">
@@ -840,7 +898,7 @@ body {
 
 <script>
 const map = L.map('map', { zoomControl: false }).setView([11.9404, 108.4583], 13);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB', maxZoom: 19 }).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB', maxZoom: 19 }).addTo(map);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 // Click bản đồ để chọn điểm xuất phát
@@ -1055,16 +1113,48 @@ function renderResult(data) {
       const latlng = [stop.lat, stop.lng];
       coords.push(latlng);
       bounds.push(latlng);
+<<<<<<< HEAD
+      const icon = L.divIcon({
+  html: `<div style="
+    background:${day.color};
+    color:white;
+    border-radius:50%;
+    width:34px;
+    height:34px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    font-size:12px;
+    border:3px solid rgba(255,255,255,0.9);
+    box-shadow:0 0 20px ${day.color};
+    opacity:${stop.feasible?1:0.45};
+  ">${stop.idx}</div>`,
+  iconSize:[34,34],
+  iconAnchor:[17,17]
+});
+=======
       const icon = L.divIcon({ className: '', html: `<div style="background:${day.color};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);opacity:${stop.feasible?1:0.4};">${stop.idx}</div>`, iconSize:[28,28], iconAnchor:[14,14] });
+>>>>>>> origin/main
       const popupHtml = `<div class="map-popup"><b>${stop.name}</b><br><div class="meta">${stop.emoji} ${stop.type_vi} | Ngày ${day.day} #${stop.idx}</div>🕐 ${stop.start}–${stop.end} ${stop.feasible?'✅':'⚠️'}<br>${stop.rating?`⭐ ${stop.rating}`:''} ${stop.address?`<br>📍 ${stop.address}`:''}${stop.video_url?`<br><a href="${stop.video_url}" target="_blank">🎬 TikTok</a>`:''}</div>`;
       const marker = L.marker(latlng, {icon}).bindPopup(popupHtml, {maxWidth:280}).addTo(map);
       allLayers.push(marker);
     });
     if (coords.length >= 2) {
-      const line = L.polyline(coords, { color: day.color, weight: 3, opacity: 0.7, dashArray: '8 5' }).addTo(map);
+      const line = L.polyline(coords, {
+        color: day.color,
+        weight: 6,
+        opacity: 0.9,   
+        dashArray: '10 8',
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(map);
       allLayers.push(line);
     }
   });
+<<<<<<< HEAD
+  if (bounds.length) map.flyToBounds(bounds, {padding:[40,40], duration:1.5});
+=======
   if (bounds.length) map.fitBounds(bounds, {padding:[40,40]});
 
   // Giữ lại marker điểm xuất phát nếu có
@@ -1079,6 +1169,7 @@ function renderResult(data) {
   } else {
     weatherBanner.style.display = 'none';
   }
+>>>>>>> origin/main
 }
 
 function toggleDay(header) {
