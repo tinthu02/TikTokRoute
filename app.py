@@ -303,7 +303,13 @@ def greedy(pois, user_start, user_end, start_lat=None, start_lng=None, user_toke
         unvisited.remove(best)
     return route
 
-def simulated_annealing(initial, num_days, user_start, user_end, T0=800, alpha=0.995, max_iter=30000, anchor_names=None, start_lat=None, start_lng=None):
+def simulated_annealing(initial, num_days, user_start, user_end, T0=800, alpha=0.995, max_iter=30000, anchor_names=None, start_lat=11.9404, start_lng=108.4583):
+    anchor_names = anchor_names or []
+    if len(initial) <= 1:
+        return initial  # không thể tối ưu khi chỉ có 1 hoặc 0 điểm
+    random.seed(42)
+    current = list(initial)
+    best = list(current)
     anchor_names = anchor_names or []
     if len(initial) <= 1:
         return initial
