@@ -7,16 +7,66 @@ Yêu cầu: pip install flask folium
 Chạy: python app.py
 Mở trình duyệt: http://localhost:5000
 =============================================================
+
+feat: tích hợp form đánh giá hành trình (feedback) và thông báo popup cảm ơn
+
+- Thêm form feedback chỉ hiển thị sau khi tạo lộ trình, gồm chọn sao (1-5) và nhập nhận xét
+- Gửi đánh giá đến endpoint /submit-feedback, lưu vào database route_feedback
+- Hiển thị popup cảm ơn sau khi gửi thành công, tự động ẩn form
+- Cải thiện giao diện popup marker: hiển thị rating dạng sao ★★★☆☆
+- Thêm hiệu ứng hover và chọn sao trong feedback"
 """
 
-from flask import Flask, render_template_string, request, jsonify
+from flask import Flask, render_template_string, request, jsonify, make_response
 import csv, math, random, json, os, sqlite3
+from uuid import uuid4
 from weather import get_rainy_days
 
+# SQLite database file
+DB_NAME = "user_data.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS route_feedback (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        route_id TEXT,
+        rating INTEGER,
+        feedback TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS user_weights (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_token TEXT,
+        cafe_weight REAL DEFAULT 1.0,
+        nature_weight REAL DEFAULT 1.0,
+        food_weight REAL DEFAULT 1.0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS preferences (
+        user_id TEXT,
+        category TEXT,
+        weight REAL,
+        PRIMARY KEY (user_id, category)
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
 app = Flask(__name__)
+init_db()
 
 # ══════════════════════════════════════════════════════════════
-# CONFIG (giữ nguyên)
+# CONFIG
 # ══════════════════════════════════════════════════════════════
 
 POI_CSV = "dalat_poi_scored_fix.csv"
@@ -38,7 +88,7 @@ TYPE_EMOJI = {
 OUTDOOR_TYPES = {"thiên nhiên", "địa điểm checkin"}
 
 # ══════════════════════════════════════════════════════════════
-# HELPERS (giữ nguyên)
+# HELPERS
 # ══════════════════════════════════════════════════════════════
 
 def safe_float(v, d=0.0):
@@ -90,7 +140,7 @@ _DEFAULT_HOURS = {
 }
 
 # ══════════════════════════════════════════════════════════════
-# LOAD POI (giữ nguyên)
+# LOAD POI
 # ══════════════════════════════════════════════════════════════
 
 _poi_cache = None
@@ -160,8 +210,6 @@ def simulate_day(poi_list, user_start, user_end, start_lat=None, start_lng=None)
     return total_km, feasible, sorted(timeline, key=lambda x: x["start"])
 
 def split_days(route, num_days):
-    # sorted_route = sorted(route, key=lambda p: p["lat"])
-    # Giữ nguyên thứ tự từ SA optimizer thay vì sort theo lat
     sorted_route = route
     n=len(sorted_route); days=[]; size=n//num_days; rem=n%num_days; idx=0
     for d in range(num_days):
@@ -175,27 +223,63 @@ def route_cost(route, num_days, user_start, user_end, start_lat=None, start_lng=
         total_km += km; total_inf += len(day_pois)-feas
     return total_km + total_inf*50
 
-def get_user_weight(user_id, category):
-
-    conn = sqlite3.connect("user_preferences.db")
+def get_user_weight(user_token, category):
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT weight
-        FROM preferences
-        WHERE user_id=? AND category=?
-    """, (user_id, category))
-
+    cursor.execute(
+        "SELECT cafe_weight, nature_weight, food_weight FROM user_weights WHERE user_token=?",
+        (user_token,)
+    )
     row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return 1.0
+    cafe_weight, nature_weight, food_weight = row
+    if category == 'cafe':
+        return cafe_weight
+    if category == 'thiên nhiên':
+        return nature_weight
+    if category in ('nhà hàng', 'chợ quán', 'quán ăn'):
+        return food_weight
+    return 1.0
 
+def update_user_weights(user_token, selected_types):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT cafe_weight, nature_weight, food_weight FROM user_weights WHERE user_token=?",
+        (user_token,)
+    )
+    row = cur.fetchone()
+    if not row:
+        cur.execute(
+            "INSERT INTO user_weights (user_token) VALUES (?)",
+            (user_token,)
+        )
+        conn.commit()
+        cafe_weight = 1.0
+        nature_weight = 1.0
+        food_weight = 1.0
+    else:
+        cafe_weight, nature_weight, food_weight = row
+    if "cafe" in selected_types:
+        cafe_weight += 0.1
+    if "thiên nhiên" in selected_types:
+        nature_weight += 0.1
+    if "quán ăn" in selected_types:
+        food_weight += 0.1
+    cur.execute(
+        """
+        UPDATE user_weights
+        SET cafe_weight=?, nature_weight=?, food_weight=?
+        WHERE user_token=?
+        """,
+        (cafe_weight, nature_weight, food_weight, user_token)
+    )
+    conn.commit()
     conn.close()
 
-    if row:
-        return row[0]
-
-    return 0
-
-def greedy(pois, user_start, user_end, start_lat=None, start_lng=None):
+def greedy(pois, user_start, user_end, start_lat=None, start_lng=None, user_token=None):
     unvisited = list(pois); route = []
     cur_lat = start_lat if start_lat else DALAT_CENTER[0]
     cur_lng = start_lng if start_lng else DALAT_CENTER[1]
@@ -207,8 +291,8 @@ def greedy(pois, user_start, user_end, start_lat=None, start_lng=None):
             ok,start,end=is_feasible(p, cur_time+tm, user_end)
             if not ok: continue
             dist=haversine_km(cur_lat,cur_lng,p["lat"],p["lng"])
-            user_weight = get_user_weight(1, p["type"])
-            val = (p["score"]+user_weight)/(dist + 0.1)
+            weight = get_user_weight(user_token, p["type"]) if user_token else 1.0
+            val = (p["score"] * weight) / (dist + 0.1)
             if val>best_val: best_val=val; best=p
         if best is None:
             best=min(unvisited, key=lambda p: haversine_km(cur_lat,cur_lng,p["lat"],p["lng"]))
@@ -227,6 +311,8 @@ def simulated_annealing(initial, num_days, user_start, user_end, T0=800, alpha=0
     current = list(initial)
     best = list(current)
     anchor_names = anchor_names or []
+    if len(initial) <= 1:
+        return initial
     random.seed(42)
     current=list(initial); best=list(current)
     cur_cost=route_cost(current,num_days,user_start,user_end,start_lat,start_lng)
@@ -258,12 +344,18 @@ def simulated_annealing(initial, num_days, user_start, user_end, T0=800, alpha=0
     return best
 
 # ══════════════════════════════════════════════════════════════
-# API ROUTES (giữ nguyên)
+# API ROUTES
 # ══════════════════════════════════════════════════════════════
 
 @app.route("/")
 def index():
-    return render_template_string(HTML_TEMPLATE)
+    user_token = request.cookies.get("user_token")
+    if not user_token:
+        user_token = str(uuid4())
+        resp = make_response(render_template_string(HTML_TEMPLATE, user_token=user_token))
+        resp.set_cookie("user_token", user_token, max_age=60*60*24*365, httponly=True, samesite='Lax')
+        return resp
+    return render_template_string(HTML_TEMPLATE, user_token=user_token)
 
 @app.route("/api/optimize", methods=["POST"])
 def optimize():
@@ -275,8 +367,6 @@ def optimize():
     types_filter = data.get("types", [])
     preferences = data.get("preferences", {})
     anchor_names = [a.strip().lower() for a in data.get("anchor_pois", []) if a.strip()]
-
-    # Điểm xuất phát tùy chọn
     start_loc  = data.get("start_location", None)
     start_lat  = float(start_loc["lat"]) if start_loc else None
     start_lng  = float(start_loc["lng"]) if start_loc else None
@@ -312,7 +402,6 @@ def optimize():
     anchors = [p for p in filtered if p["anchor"]]
     non_anch = [p for p in filtered if not p["anchor"]]
 
-    # Giảm score theo khoảng cách từ điểm xuất phát (nếu có)
     if start_lat and start_lng:
         for p in non_anch:
             dist = haversine_km(start_lat, start_lng, p["lat"], p["lng"])
@@ -325,8 +414,13 @@ def optimize():
         original_count = len(pois)
         pois = [p for p in pois if p['type'] not in OUTDOOR_TYPES]
         print(f"  Do dự báo mưa, đã loại {original_count - len(pois)} POI ngoài trời")
-        
-    g_route = greedy(pois, user_start, user_end, start_lat, start_lng)
+
+    user_token = request.cookies.get('user_token')
+    if user_token and types_filter:
+        update_user_weights(user_token, types_filter)
+        print(f"  Updated weights for user_token={user_token}, types={types_filter}")
+
+    g_route = greedy(pois, user_start, user_end, start_lat, start_lng, user_token)
     if not g_route:
         return jsonify({
             "days": [],
@@ -361,7 +455,7 @@ def optimize():
             "total_km": round(total_km,1), "feasible": total_feas, "total_stops": total_stops,
             "rate": round(total_feas/total_stops*100) if total_stops else 0, "num_days": num_days,
             "anchors": [p["name"] for p in pois if p["anchor"]],
-        "start_location": start_loc,
+            "start_location": start_loc,
         },
         "weather": {
             "rainy_days": rainy_days,
@@ -381,59 +475,56 @@ def search_poi():
 
 @app.route("/api/poi_types")
 def poi_types():
-    pois = load_pois()  
+    pois = load_pois()
     types = sorted(set(p["type"] for p in pois))
     return jsonify([{"value": t, "label": TYPE_VI.get(t,t), "emoji": TYPE_EMOJI.get(t,"📍")} for t in types])
 
 @app.route("/api/feedback", methods=["POST"])
 def feedback():
-
     data = request.json
-
     user_id = data["user_id"]
     category = data["category"]
     rating = data["rating"]
 
-    conn = sqlite3.connect("user_preferences.db")
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-
     cursor.execute("""
-        SELECT weight
-        FROM preferences
-        WHERE user_id=? AND category=?
+        SELECT weight FROM preferences WHERE user_id=? AND category=?
     """, (user_id, category))
-
     row = cursor.fetchone()
-
     if row:
         old_weight = row[0]
-
         new_weight = min(1.0, max(0.0, old_weight + (rating / 5 - 0.5) * 0.1))
-
         cursor.execute("""
-            UPDATE preferences
-            SET weight=?
-            WHERE user_id=? AND category=?
+            UPDATE preferences SET weight=? WHERE user_id=? AND category=?
         """, (new_weight, user_id, category))
-
     else:
         new_weight = rating / 5
-
         cursor.execute("""
-            INSERT INTO preferences
-            VALUES (?, ?, ?)
+            INSERT INTO preferences (user_id, category, weight) VALUES (?, ?, ?)
         """, (user_id, category, new_weight))
-
     conn.commit()
     conn.close()
+    return jsonify({"message": "feedback saved", "new_weight": new_weight})
 
-    return jsonify({
-        "message": "feedback saved",
-        "new_weight": new_weight
-    })
+@app.route("/submit-feedback", methods=["POST"])
+def submit_feedback():
+    data = request.json or {}
+    rating = data.get("rating")
+    feedback_text = data.get("feedback", "")
+    route_id = data.get("route_id", "default")
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO route_feedback (route_id, rating, feedback) VALUES (?, ?, ?)",
+        (route_id, rating, feedback_text)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True, "message": "Cảm ơn bạn đã đánh giá hành trình!"})
 
 # ══════════════════════════════════════════════════════════════
-# HTML TEMPLATE (anchor input đồng bộ)
+# HTML TEMPLATE (đã sửa CSS popup và sao)
 # ══════════════════════════════════════════════════════════════
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -478,9 +569,11 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   z-index: 10;
 }
-/* Header có nút toggle */
 .sidebar-header {
   display: flex;
   justify-content: space-between;
@@ -512,7 +605,6 @@ body {
   background: var(--accent);
   color: #0a0c12;
 }
-/* Form section – collapsible */
 #form-section {
   background: rgba(20,24,34,0.6);
   border-bottom: 1px solid var(--border);
@@ -528,7 +620,6 @@ body {
 #form-inner {
   padding: 20px 0;
 }
-/* 4 input trên 1 hàng */
 .form-row-compact {
   display: flex;
   gap: 12px;
@@ -556,7 +647,6 @@ body {
   font-size: 13px;
   font-family: 'Inter', sans-serif;
 }
-/* Type filters & preferences */
 #type-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
 .type-pill {
   background: var(--bg);
@@ -584,7 +674,6 @@ body {
   padding: 6px 8px;
   cursor: pointer;
 }
-/* Anchor section cải tiến - đồng bộ input */
 #anchor-section {
   margin: 8px 0 12px;
 }
@@ -683,7 +772,6 @@ body {
   cursor: pointer;
   margin-top: 12px;
 }
-/* Summary bar dạng cột */
 #summary-bar {
   display: none;
   padding: 12px 20px;
@@ -718,7 +806,6 @@ body {
   color: #93c5fd;
   display: none;
 }
-/* Timeline */
 #timeline {
   flex: 1;
   overflow-y: auto;
@@ -742,8 +829,14 @@ body {
   padding: 8px 20px 8px 36px;
   cursor: pointer;
   border-left: 3px solid transparent;
+  transition: 0.25s;
+  border: 1px solid rgba(255,255,255,0.05);
 }
-.stop-item:hover { background: rgba(255,255,255,0.03); }
+.stop-item:hover {
+  transform: translateX(8px);
+  background: rgba(255,255,255,0.05);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
 .stop-num {
   width: 24px; height: 24px;
   border-radius: 50%;
@@ -754,8 +847,39 @@ body {
   font-weight: 700;
   color: white;
 }
-.stop-name { font-size: 13px; font-weight: 500; }
-.stop-meta { font-size: 10px; color: var(--text-muted); display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.stop-body { flex: 1; min-width: 0; }
+.stop-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stop-meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 10px; }
+/* Popup marker - không viền trắng dày, bóng mờ nhẹ */
+.map-popup {
+  background: rgba(20,20,25,0.95);
+  color: white;
+  border-radius: 12px;
+  padding: 6px 10px;
+  backdrop-filter: blur(6px);
+  border: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.map-popup b {
+  font-size: 14px;
+  color: #f0d79a;
+}
+.map-popup .meta {
+  opacity: 0.8;
+  margin: 2px 0;
+  font-size: 11px;
+}
+.map-popup .rating-stars {
+  display: inline-block;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: #ffcc00;
+}
+.stop-time { color: var(--accent); font-weight: 500; }
+.badge-infeasible { background: rgba(255,94,94,0.15); color: #ff5e5e; padding: 2px 8px; border-radius: 20px; font-size: 10px; }
+.badge-anchor { background: rgba(212,184,122,0.15); color: var(--accent); padding: 2px 8px; border-radius: 20px; font-size: 10px; }
 #map-container { flex: 1; position: relative; }
 #map { width: 100%; height: 100%; }
 #loading {
@@ -773,6 +897,61 @@ body {
 #loading.show { display: flex; }
 .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* Feedback container */
+#feedback-container {
+  display: none;
+  padding: 16px;
+  border-top: 1px solid var(--border);
+}
+.feedback-box {
+  background: var(--surface-light);
+  border-radius: 12px;
+  padding: 12px;
+}
+.feedback-box h3 { font-size: 14px; margin-bottom: 8px; }
+.stars {
+  display: flex;
+  gap: 4px;
+  margin: 8px 0;
+}
+.star {
+  cursor: pointer;
+  font-size: 24px;
+  transition: 0.1s;
+  display: inline-block;
+}
+.star.selected {
+  color: #ffcc00;
+  filter: drop-shadow(0 0 2px gold);
+}
+.star:hover {
+  transform: scale(1.1);
+}
+.popup {
+  display: none;
+  position: fixed;
+  z-index: 999;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  justify-content: center;
+  align-items: center;
+}
+.popup-content {
+  background: white;
+  padding: 30px;
+  border-radius: 20px;
+  text-align: center;
+  width: 320px;
+  animation: popupShow 0.3s ease;
+  color: #222;
+}
+.popup-content h2 { color: #ff4d6d; font-size: 32px; margin-bottom: 10px; }
+.popup-content p { color: #444; font-size: 18px; line-height: 1.5; }
+.popup-content button { margin-top: 15px; background: #ff4d6d; color: white; border: none; padding: 10px 18px; border-radius: 10px; cursor: pointer; }
+@keyframes popupShow { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 </style>
 </head>
 <body>
@@ -782,7 +961,6 @@ body {
     <h1>🏔 Đà Lạt Planner</h1>
     <div class="toggle-form-btn" onclick="toggleForm()" id="toggleBtn">▲ Thu gọn</div>
   </div>
-
   <div id="form-section" style="max-height: 500px;">
     <div id="form-inner">
       <div class="form-row-compact">
@@ -791,7 +969,6 @@ body {
         <div class="form-group"><label>Bắt đầu</label><select id="start_hour"><option value="6">06:00</option><option value="7" selected>07:00</option><option value="8">08:00</option><option value="9">09:00</option></select></div>
         <div class="form-group"><label>Kết thúc</label><select id="end_hour"><option value="19">19:00</option><option value="20">20:00</option><option value="21" selected>21:00</option><option value="22">22:00</option></select></div>
       </div>
-
       <label>🧭 Sở thích du lịch</label>
       <div class="preference-group">
         <label><input type="checkbox" id="pref_adventure"> 🏔 Mạo hiểm</label>
@@ -799,16 +976,11 @@ body {
         <label><input type="checkbox" id="pref_food"> 🍜 Ăn uống</label>
         <label><input type="checkbox" id="pref_checkin"> 📸 Check-in</label>
       </div>
-
       <label>Loại địa điểm</label>
       <div id="type-filters"><div class="type-pill active" data-type="all">✨ Tất cả</div></div>
-
       <label>📌 Điểm bắt buộc</label>
       <div id="anchor-section">
-        <div style="position:relative;">
-          <input type="text" id="anchor-input" placeholder="Tìm địa điểm..." autocomplete="off">
-          <div id="anchor-drop"></div>
-        </div>
+        <div style="position:relative;"><input type="text" id="anchor-input" placeholder="Tìm địa điểm..." autocomplete="off"><div id="anchor-drop"></div></div>
         <div id="anchor-tags" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;"></div>
       </div>
       <div id="start-location-section">
@@ -817,7 +989,7 @@ body {
           <div class="sl-badge" id="sl-badge">🏔 Mặc định: Trung tâm Đà Lạt</div>
           <button class="sl-btn" onclick="detectLocation()">📡 Vị trí của tôi</button>
           <button class="sl-btn" onclick="pickOnMap()">🗺 Chọn trên bản đồ</button>
-          <button class="sl-btn" id="sl-clear" onclick="clearStartLocation()" style="display:none; color:#ff5e5e;">✕</button>
+          <button class="sl-btn" id="sl-clear" onclick="clearStartLocation()" style="display:none;">✕</button>
         </div>
       </div>
       <button id="btn-optimize" onclick="optimize()">🗺 Tối ưu lộ trình</button>
@@ -834,6 +1006,22 @@ body {
   <div id="timeline">
     <div style="padding:40px 20px; text-align:center; color:var(--text-muted);">⬅️ Nhập thông tin và bấm tạo lộ trình</div>
   </div>
+
+  <div id="feedback-container">
+    <div class="feedback-box">
+      <h3>⭐ Đánh giá hành trình</h3>
+      <div class="stars">
+        <span class="star" data-value="1">⭐</span>
+        <span class="star" data-value="2">⭐</span>
+        <span class="star" data-value="3">⭐</span>
+        <span class="star" data-value="4">⭐</span>
+        <span class="star" data-value="5">⭐</span>
+      </div>
+      <textarea id="feedbackText" placeholder="Chia sẻ trải nghiệm của bạn..." style="width:100%;min-height:80px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;"></textarea>
+      <button onclick="submitFeedback()" style="margin-top:8px;width:100%;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#0a0c12;border:none;border-radius:8px;padding:10px;font-weight:700;cursor:pointer;">Gửi đánh giá</button>
+      <p id="feedbackMessage" style="margin-top:8px;color:var(--text-muted);"></p>
+    </div>
+  </div>
 </div>
 
 <div id="map-container">
@@ -841,27 +1029,28 @@ body {
   <div id="map"></div>
 </div>
 
+<div id="thankPopup" class="popup">
+  <div class="popup-content">
+    <h2>💖 Cảm ơn bạn!</h2>
+    <p>Chúc bạn có trải nghiệm tuyệt vời cùng TikTokRoute!</p>
+    <button onclick="closePopup()">Đóng</button>
+  </div>
+</div>
+
 <script>
+const USER_TOKEN = "{{ user_token }}";
 const map = L.map('map', { zoomControl: false }).setView([11.9404, 108.4583], 13);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB', maxZoom: 19 }).addTo(map);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// Click bản đồ để chọn điểm xuất phát
-map.on('click', function(e) {
-  if (!pickingStartLocation) return;
-  pickingStartLocation = false;
-  map.getContainer().style.cursor = '';
-  setStartLocation(e.latlng.lat, e.latlng.lng, 'Điểm chọn trên bản đồ');
-});
-
 let allLayers = [];
 let selectedTypes = new Set();
 let anchorPOIs = [];
-let startLocation = null;      // {lat, lng} hoặc null
+let startLocation = null;
 let pickingStartLocation = false;
 let startMarker = null;
+let selectedRating = 0;
 
-// Toggle form
 function toggleForm() {
   const formSection = document.getElementById('form-section');
   const btn = document.getElementById('toggleBtn');
@@ -874,7 +1063,6 @@ function toggleForm() {
   }
 }
 
-// ── Start Location Functions ──────────────────────────
 function detectLocation() {
   if (!navigator.geolocation) { alert('Trình duyệt không hỗ trợ định vị.'); return; }
   const badge = document.getElementById('sl-badge');
@@ -897,11 +1085,7 @@ function setStartLocation(lat, lng, label) {
   document.getElementById('sl-badge').innerHTML = '📍 ' + label + ' (' + lat.toFixed(4) + ', ' + lng.toFixed(4) + ')';
   document.getElementById('sl-clear').style.display = 'block';
   if (startMarker) map.removeLayer(startMarker);
-  const icon = L.divIcon({
-    className: '',
-    html: '<div style="background:#d4b87a;color:#0a0c12;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);">🏁</div>',
-    iconSize:[28,28], iconAnchor:[14,14]
-  });
+  const icon = L.divIcon({ className: '', html: '<div style="background:#d4b87a;color:#0a0c12;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);">🏁</div>', iconSize:[28,28], iconAnchor:[14,14] });
   startMarker = L.marker([lat, lng], {icon}).bindPopup('📍 Điểm xuất phát').addTo(map);
   map.setView([lat, lng], 15);
 }
@@ -912,6 +1096,13 @@ function clearStartLocation() {
   document.getElementById('sl-clear').style.display = 'none';
   if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
 }
+
+map.on('click', function(e) {
+  if (!pickingStartLocation) return;
+  pickingStartLocation = false;
+  map.getContainer().style.cursor = '';
+  setStartLocation(e.latlng.lat, e.latlng.lng, 'Điểm chọn trên bản đồ');
+});
 
 fetch('/api/poi_types').then(r=>r.json()).then(types => {
   const container = document.getElementById('type-filters');
@@ -997,12 +1188,12 @@ async function optimize() {
     const res = await fetch('/api/optimize', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
     const data = await res.json();
     renderResult(data);
-    // Sau khi có kết quả, thu gọn form
     const formSection = document.getElementById('form-section');
     if (!formSection.classList.contains('collapsed')) {
       formSection.classList.add('collapsed');
       document.getElementById('toggleBtn').innerHTML = '▼ Mở rộng';
     }
+    document.getElementById('feedback-container').style.display = 'block';
   } catch(e) { alert('Lỗi: '+e.message); }
   finally { btn.disabled=false; document.getElementById('loading').classList.remove('show'); }
 }
@@ -1058,19 +1249,17 @@ function renderResult(data) {
       const latlng = [stop.lat, stop.lng];
       coords.push(latlng);
       bounds.push(latlng);
-      const icon = L.divIcon({ className: '', html: `<div style="background:${day.color};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);opacity:${stop.feasible?1:0.4};">${stop.idx}</div>`, iconSize:[28,28], iconAnchor:[14,14] });
-      const popupHtml = `<div class="map-popup"><b>${stop.name}</b><br><div class="meta">${stop.emoji} ${stop.type_vi} | Ngày ${day.day} #${stop.idx}</div>🕐 ${stop.start}–${stop.end} ${stop.feasible?'✅':'⚠️'}<br>${stop.rating?`⭐ ${stop.rating}`:''} ${stop.address?`<br>📍 ${stop.address}`:''}${stop.video_url?`<br><a href="${stop.video_url}" target="_blank">🎬 TikTok</a>`:''}</div>`;
+      const icon = L.divIcon({ className: '', html: `<div style="background:${day.color};color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);opacity:${stop.feasible?1:0.45};">${stop.idx}</div>`, iconSize:[32,32], iconAnchor:[16,16] });
+      const popupHtml = `<div class="map-popup"><b>${stop.name}</b><br><div class="meta">${stop.emoji} ${stop.type_vi} | Ngày ${day.day} #${stop.idx}</div>🕐 ${stop.start}–${stop.end} ${stop.feasible?'✅':'⚠️'}<br>⭐ <span class="rating-stars">${'★'.repeat(Math.round(stop.rating))}${'☆'.repeat(5-Math.round(stop.rating))}</span><br>${stop.address?`📍 ${stop.address.substring(0,60)}<br>`:''}${stop.video_url?`<a href="${stop.video_url}" target="_blank">🎬 TikTok</a>`:''}</div>`;
       const marker = L.marker(latlng, {icon}).bindPopup(popupHtml, {maxWidth:280}).addTo(map);
       allLayers.push(marker);
     });
     if (coords.length >= 2) {
-      const line = L.polyline(coords, { color: day.color, weight: 3, opacity: 0.7, dashArray: '8 5' }).addTo(map);
+      const line = L.polyline(coords, { color: day.color, weight: 4, opacity: 0.8, dashArray: '8 6', lineCap: 'round', lineJoin: 'round' }).addTo(map);
       allLayers.push(line);
     }
   });
   if (bounds.length) map.fitBounds(bounds, {padding:[40,40]});
-
-  // Giữ lại marker điểm xuất phát nếu có
   if (startMarker) startMarker.addTo(map);
 
   const weatherBanner = document.getElementById('weather-banner');
@@ -1094,6 +1283,43 @@ function focusStop(lat, lng, name) {
   allLayers.forEach(l => { if (l.getLatLng && Math.abs(l.getLatLng().lat-lat)<0.0001) l.openPopup(); });
 }
 function esc(s) { return (s||'').replace(/'/g,"\\'"); }
+
+// Khởi tạo sự kiện cho các sao
+function initStars() {
+  const stars = document.querySelectorAll('.star');
+  stars.forEach(star => {
+    star.addEventListener('click', () => {
+      const value = parseInt(star.dataset.value);
+      selectedRating = value;
+      stars.forEach((s, idx) => {
+        if (idx < value) s.classList.add('selected');
+        else s.classList.remove('selected');
+      });
+    });
+  });
+}
+initStars();
+
+async function submitFeedback() {
+  if (selectedRating === 0) {
+    alert('Vui lòng chọn số sao đánh giá!');
+    return;
+  }
+  const feedback = document.getElementById("feedbackText").value;
+  const response = await fetch("/submit-feedback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rating: selectedRating, feedback: feedback, route_id: "dalat_route" })
+  });
+  const result = await response.json();
+  document.getElementById("feedbackMessage").innerText = result.message;
+  document.getElementById('feedback-container').style.display = 'none';
+  selectedRating = 0;
+  document.getElementById("feedbackText").value = '';
+  document.querySelectorAll('.star').forEach(s => s.classList.remove('selected'));
+  document.getElementById("thankPopup").style.display = "flex";
+}
+function closePopup() { document.getElementById("thankPopup").style.display = "none"; }
 </script>
 </body>
 </html>
