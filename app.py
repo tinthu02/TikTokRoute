@@ -219,7 +219,13 @@ def greedy(pois, user_start, user_end, start_lat=None, start_lng=None):
         unvisited.remove(best)
     return route
 
-def simulated_annealing(initial, num_days, user_start, user_end, T0=800, alpha=0.995, max_iter=30000, anchor_names=None, start_lat=None, start_lng=None):
+def simulated_annealing(initial, num_days, user_start, user_end, T0=800, alpha=0.995, max_iter=30000, anchor_names=None, start_lat=11.9404, start_lng=108.4583):
+    anchor_names = anchor_names or []
+    if len(initial) <= 1:
+        return initial  # không thể tối ưu khi chỉ có 1 hoặc 0 điểm
+    random.seed(42)
+    current = list(initial)
+    best = list(current)
     anchor_names = anchor_names or []
     random.seed(42)
     current=list(initial); best=list(current)
@@ -319,8 +325,16 @@ def optimize():
         original_count = len(pois)
         pois = [p for p in pois if p['type'] not in OUTDOOR_TYPES]
         print(f"  Do dự báo mưa, đã loại {original_count - len(pois)} POI ngoài trời")
-
+        
     g_route = greedy(pois, user_start, user_end, start_lat, start_lng)
+    if not g_route:
+        return jsonify({
+            "days": [],
+            "summary": {
+                "total_km": 0, "feasible": 0, "total_stops": 0,
+                "rate": 0, "num_days": num_days, "anchors": []
+            }
+        })
     sa_route = simulated_annealing(g_route, num_days, user_start, user_end, anchor_names=anchor_names, start_lat=start_lat, start_lng=start_lng)
 
     days_data = []
