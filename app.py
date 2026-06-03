@@ -46,9 +46,16 @@ def init_db():
         cafe_weight REAL DEFAULT 1.0,
         nature_weight REAL DEFAULT 1.0,
         food_weight REAL DEFAULT 1.0,
+        checkin_weight REAL DEFAULT 1.0,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    # Migrate existing DBs: add checkin_weight if missing
+    try:
+        cur.execute("ALTER TABLE user_weights ADD COLUMN checkin_weight REAL DEFAULT 1.0")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS preferences (
@@ -223,61 +230,99 @@ def route_cost(route, num_days, user_start, user_end, start_lat=None, start_lng=
         total_km += km; total_inf += len(day_pois)-feas
     return total_km + total_inf*50
 
-def get_user_weight(user_token, category):
+WEIGHT_BOUNDS = (0.5, 2.0)
+WEIGHT_INCREASE = 0.1   # khi category được chọn
+WEIGHT_DECAY    = 0.03  # khi category không được chọn
+
+def _clamp_weight(w):
+    return max(WEIGHT_BOUNDS[0], min(WEIGHT_BOUNDS[1], w))
+
+def get_user_weights(user_token):
+    """Trả về dict {cafe, nature, food, checkin} cho user_token."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT cafe_weight, nature_weight, food_weight FROM user_weights WHERE user_token=?",
+        "SELECT cafe_weight, nature_weight, food_weight, checkin_weight FROM user_weights WHERE user_token=?",
         (user_token,)
     )
     row = cursor.fetchone()
     conn.close()
     if not row:
+        return {"cafe": 1.0, "nature": 1.0, "food": 1.0, "checkin": 1.0}
+    return {"cafe": row[0], "nature": row[1], "food": row[2], "checkin": row[3]}
+
+def get_user_weight(user_token, category):
+    """Lấy trọng số cho 1 category của user."""
+    if not user_token:
         return 1.0
-    cafe_weight, nature_weight, food_weight = row
+    weights = get_user_weights(user_token)
     if category == 'cafe':
-        return cafe_weight
+        return weights["cafe"]
     if category == 'thiên nhiên':
-        return nature_weight
+        return weights["nature"]
     if category in ('nhà hàng', 'chợ quán', 'quán ăn'):
-        return food_weight
+        return weights["food"]
+    if category == 'địa điểm checkin':
+        return weights["checkin"]
     return 1.0
 
-def update_user_weights(user_token, selected_types):
+def update_user_weights(user_token, selected_types, increase=None):
+    """
+    Cập nhật trọng số theo lượt sử dụng:
+    - Category được chọn  → tăng `increase` (mặc định WEIGHT_INCREASE)
+    - Category không chọn → giảm WEIGHT_DECAY (decay nhẹ)
+    - Kết quả được clamp trong WEIGHT_BOUNDS
+    - In log ra terminal
+    increase=None  → dùng WEIGHT_INCREASE (type pill, 0.1)
+    increase=0.15  → dùng cho checkbox sở thích (tín hiệu mạnh hơn)
+    """
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute(
-        "SELECT cafe_weight, nature_weight, food_weight FROM user_weights WHERE user_token=?",
+        "SELECT cafe_weight, nature_weight, food_weight, checkin_weight FROM user_weights WHERE user_token=?",
         (user_token,)
     )
     row = cur.fetchone()
     if not row:
         cur.execute(
-            "INSERT INTO user_weights (user_token) VALUES (?)",
+            "INSERT INTO user_weights (user_token, cafe_weight, nature_weight, food_weight, checkin_weight) VALUES (?,1.0,1.0,1.0,1.0)",
             (user_token,)
         )
         conn.commit()
-        cafe_weight = 1.0
-        nature_weight = 1.0
-        food_weight = 1.0
+        cafe_w, nature_w, food_w, checkin_w = 1.0, 1.0, 1.0, 1.0
     else:
-        cafe_weight, nature_weight, food_weight = row
-    if "cafe" in selected_types:
-        cafe_weight += 0.1
-    if "thiên nhiên" in selected_types:
-        nature_weight += 0.1
-    if "quán ăn" in selected_types:
-        food_weight += 0.1
+        cafe_w, nature_w, food_w, checkin_w = row
+
+    cafe_sel    = "cafe" in selected_types
+    nature_sel  = "thiên nhiên" in selected_types
+    food_sel    = bool({"nhà hàng", "chợ quán", "quán ăn"} & set(selected_types))
+    checkin_sel = "địa điểm checkin" in selected_types
+
+    delta = increase if increase is not None else WEIGHT_INCREASE
+    cafe_w    = _clamp_weight(cafe_w    + (delta if cafe_sel    else -WEIGHT_DECAY))
+    nature_w  = _clamp_weight(nature_w  + (delta if nature_sel  else -WEIGHT_DECAY))
+    food_w    = _clamp_weight(food_w    + (delta if food_sel    else -WEIGHT_DECAY))
+    checkin_w = _clamp_weight(checkin_w + (delta if checkin_sel else -WEIGHT_DECAY))
+
     cur.execute(
-        """
-        UPDATE user_weights
-        SET cafe_weight=?, nature_weight=?, food_weight=?
-        WHERE user_token=?
-        """,
-        (cafe_weight, nature_weight, food_weight, user_token)
+        """UPDATE user_weights
+           SET cafe_weight=?, nature_weight=?, food_weight=?, checkin_weight=?,
+               updated_at=CURRENT_TIMESTAMP
+           WHERE user_token=?""",
+        (cafe_w, nature_w, food_w, checkin_w, user_token)
     )
     conn.commit()
     conn.close()
+
+    token_short = user_token[:8]
+    source = "sở thích" if (increase and increase > WEIGHT_INCREASE) else "loại đ/điểm"
+    print(f"  [Weights/{source}] user={token_short}… "
+          f"| ☕cafe={cafe_w:.2f}({'↑' if cafe_sel else '↓'}) "
+          f"🌿nature={nature_w:.2f}({'↑' if nature_sel else '↓'}) "
+          f"🍜food={food_w:.2f}({'↑' if food_sel else '↓'}) "
+          f"📸checkin={checkin_w:.2f}({'↑' if checkin_sel else '↓'})")
+
+    return {"cafe": cafe_w, "nature": nature_w, "food": food_w, "checkin": checkin_w}
 
 def greedy(pois, user_start, user_end, start_lat=None, start_lng=None, user_token=None):
     unvisited = list(pois); route = []
@@ -416,9 +461,27 @@ def optimize():
         print(f"  Do dự báo mưa, đã loại {original_count - len(pois)} POI ngoài trời")
 
     user_token = request.cookies.get('user_token')
-    if user_token and types_filter:
-        update_user_weights(user_token, types_filter)
-        print(f"  Updated weights for user_token={user_token}, types={types_filter}")
+    new_weights = None
+    if user_token:
+        # Tín hiệu 1: Loại địa điểm (type pill) — increase mặc định 0.1
+        if types_filter:
+            new_weights = update_user_weights(user_token, types_filter)
+
+        # Tín hiệu 2: Sở thích du lịch (checkbox) — increase mạnh hơn 0.15
+        # Map mỗi checkbox → các types POI tương ứng
+        PREF_TYPE_MAP = {
+            'adventure': ['thiên nhiên', 'địa điểm checkin'],
+            'relax':     ['cafe'],
+            'food':      ['nhà hàng', 'chợ quán', 'quán ăn'],
+            'checkin':   ['địa điểm checkin', 'cafe'],
+        }
+        pref_types = []
+        for pref, active in preferences.items():
+            if active:
+                pref_types.extend(PREF_TYPE_MAP.get(pref, []))
+        if pref_types:
+            new_weights = update_user_weights(user_token, list(set(pref_types)), increase=0.15)
+            print(f"  [Weights/sở thích] prefs={[k for k,v in preferences.items() if v]} → types={list(set(pref_types))}")
 
     g_route = greedy(pois, user_start, user_end, start_lat, start_lng, user_token)
     if not g_route:
@@ -460,8 +523,40 @@ def optimize():
         "weather": {
             "rainy_days": rainy_days,
             "outdoor_removed": any(rainy_days),
-        }
+        },
+        "weights": new_weights,
     })
+
+@app.route("/api/user_weights", methods=["GET"])
+def api_get_user_weights():
+    user_token = request.cookies.get("user_token")
+    if not user_token:
+        return jsonify({"cafe": 1.0, "nature": 1.0, "food": 1.0, "checkin": 1.0})
+    return jsonify(get_user_weights(user_token))
+
+@app.route("/api/user_weights/reset", methods=["POST"])
+def api_reset_user_weights():
+    user_token = request.cookies.get("user_token")
+    if not user_token:
+        return jsonify({"success": False, "message": "Không tìm thấy user token"})
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute(
+        """UPDATE user_weights
+           SET cafe_weight=1.0, nature_weight=1.0, food_weight=1.0, checkin_weight=1.0,
+               updated_at=CURRENT_TIMESTAMP
+           WHERE user_token=?""",
+        (user_token,)
+    )
+    if cur.rowcount == 0:
+        cur.execute(
+            "INSERT INTO user_weights (user_token, cafe_weight, nature_weight, food_weight, checkin_weight) VALUES (?,1.0,1.0,1.0,1.0)",
+            (user_token,)
+        )
+    conn.commit()
+    conn.close()
+    print(f"  [Weights] user={user_token[:8]}… → RESET về 1.0 tất cả")
+    return jsonify({"success": True, "weights": {"cafe": 1.0, "nature": 1.0, "food": 1.0, "checkin": 1.0}})
 
 @app.route("/api/search_poi")
 def search_poi():
@@ -952,6 +1047,98 @@ body {
 .popup-content p { color: #444; font-size: 18px; line-height: 1.5; }
 .popup-content button { margin-top: 15px; background: #ff4d6d; color: white; border: none; padding: 10px 18px; border-radius: 10px; cursor: pointer; }
 @keyframes popupShow { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ── Toast thông báo trọng số ── */
+#weight-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--surface-light);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 12px 16px;
+  min-width: 260px;
+  max-width: 340px;
+  z-index: 9999;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  transform: translateY(20px);
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+  pointer-events: none;
+}
+#weight-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+#weight-toast .toast-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.weight-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  margin: 4px 0;
+  color: var(--text);
+}
+.weight-bar-bg {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.weight-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.weight-val {
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 34px;
+  text-align: right;
+}
+.weight-arrow { font-size: 12px; width: 14px; }
+
+/* ── Panel trọng số trong sidebar ── */
+#weights-panel {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  display: none;
+}
+#weights-panel .wp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+#weights-panel .wp-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+#weights-panel .wp-reset {
+  font-size: 11px;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: 20px;
+  padding: 2px 10px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+#weights-panel .wp-reset:hover {
+  background: var(--accent);
+  color: #0a0c12;
+}
 </style>
 </head>
 <body>
@@ -996,6 +1183,18 @@ body {
     </div>
   </div>
 
+  <!-- Panel trọng số cá nhân -->
+  <div id="weights-panel">
+    <div class="wp-header">
+      <span class="wp-title">🧠 Trọng số sở thích của bạn</span>
+      <button class="wp-reset" onclick="resetWeights()">↺ Reset</button>
+    </div>
+    <div class="weight-row"><span>☕ Cà phê</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-cafe" style="width:50%"></div></div><span class="weight-val" id="wv-cafe">1.00</span></div>
+    <div class="weight-row"><span>🌿 Thiên nhiên</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-nature" style="width:50%"></div></div><span class="weight-val" id="wv-nature">1.00</span></div>
+    <div class="weight-row"><span>🍜 Ăn uống</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-food" style="width:50%"></div></div><span class="weight-val" id="wv-food">1.00</span></div>
+    <div class="weight-row"><span>📸 Check-in</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-checkin" style="width:50%"></div></div><span class="weight-val" id="wv-checkin">1.00</span></div>
+  </div>
+
   <div id="summary-bar" style="display:none;">
     <div class="summary-item"><div class="label">Tổng km</div><div class="value" id="s-km">-</div><div class="unit">km</div></div>
     <div class="summary-item"><div class="label">Đúng giờ</div><div class="value" id="s-rate">-</div><div class="unit">%</div></div>
@@ -1027,6 +1226,15 @@ body {
 <div id="map-container">
   <div id="loading"><div class="spinner"></div><p>Đang tính toán lộ trình...</p></div>
   <div id="map"></div>
+</div>
+
+<!-- Toast trọng số -->
+<div id="weight-toast">
+  <div class="toast-title">🧠 Hồ sơ sở thích đã cập nhật</div>
+  <div class="weight-row"><span>☕ Cà phê</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-cafe" style="width:50%"></div></div><span class="weight-arrow" id="twa-cafe"></span><span class="weight-val" id="twv-cafe">1.00</span></div>
+  <div class="weight-row"><span>🌿 Thiên nhiên</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-nature" style="width:50%"></div></div><span class="weight-arrow" id="twa-nature"></span><span class="weight-val" id="twv-nature">1.00</span></div>
+  <div class="weight-row"><span>🍜 Ăn uống</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-food" style="width:50%"></div></div><span class="weight-arrow" id="twa-food"></span><span class="weight-val" id="twv-food">1.00</span></div>
+  <div class="weight-row"><span>📸 Check-in</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-checkin" style="width:50%"></div></div><span class="weight-arrow" id="twa-checkin"></span><span class="weight-val" id="twv-checkin">1.00</span></div>
 </div>
 
 <div id="thankPopup" class="popup">
@@ -1271,6 +1479,12 @@ function renderResult(data) {
   } else {
     weatherBanner.style.display = 'none';
   }
+
+  // Cập nhật trọng số nếu server trả về
+  if (data.weights) {
+    renderWeightPanel(data.weights);
+    showWeightToast(data.weights);
+  }
 }
 
 function toggleDay(header) {
@@ -1320,6 +1534,68 @@ async function submitFeedback() {
   document.getElementById("thankPopup").style.display = "flex";
 }
 function closePopup() { document.getElementById("thankPopup").style.display = "none"; }
+
+// ── Trọng số cá nhân ──────────────────────────────────────────
+// Chuyển weight (0.5-2.0) → % thanh (0-100%)
+function weightToPct(w) { return Math.round(((w - 0.5) / 1.5) * 100); }
+
+let _prevWeights = null;
+let _toastTimer = null;
+
+function renderWeightPanel(w) {
+  const panel = document.getElementById('weights-panel');
+  panel.style.display = 'block';
+  const cats = ['cafe','nature','food','checkin'];
+  cats.forEach(c => {
+    const pct = weightToPct(w[c]);
+    document.getElementById(`wb-${c}`).style.width = pct + '%';
+    document.getElementById(`wv-${c}`).textContent = w[c].toFixed(2);
+  });
+}
+
+function showWeightToast(w) {
+  const cats = ['cafe','nature','food','checkin'];
+  cats.forEach(c => {
+    const pct = weightToPct(w[c]);
+    document.getElementById(`twb-${c}`).style.width = pct + '%';
+    document.getElementById(`twv-${c}`).textContent = w[c].toFixed(2);
+    let arrow = '';
+    if (_prevWeights) {
+      if (w[c] > _prevWeights[c]) arrow = '<span style="color:#4ade80">↑</span>';
+      else if (w[c] < _prevWeights[c]) arrow = '<span style="color:#f87171">↓</span>';
+    }
+    document.getElementById(`twa-${c}`).innerHTML = arrow;
+  });
+  _prevWeights = {...w};
+
+  const toast = document.getElementById('weight-toast');
+  toast.classList.add('show');
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+}
+
+async function loadInitialWeights() {
+  try {
+    const res = await fetch('/api/user_weights');
+    const w = await res.json();
+    _prevWeights = {...w};
+    renderWeightPanel(w);
+  } catch(e) { console.warn('Không tải được trọng số:', e); }
+}
+
+async function resetWeights() {
+  try {
+    const res = await fetch('/api/user_weights/reset', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      renderWeightPanel(data.weights);
+      showWeightToast(data.weights);
+    }
+  } catch(e) { console.warn('Reset thất bại:', e); }
+}
+
+// Tải weights khi khởi động
+loadInitialWeights();
 </script>
 </body>
 </html>
