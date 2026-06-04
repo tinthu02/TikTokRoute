@@ -20,7 +20,10 @@ feat: tích hợp form đánh giá hành trình (feedback) và thông báo popup
 from flask import Flask, render_template_string, request, jsonify, make_response
 import csv, math, random, json, os, sqlite3
 from uuid import uuid4
+
+import requests
 from weather import get_rainy_days
+import osrm
 
 # SQLite database file
 DB_NAME = "user_data.db"
@@ -119,6 +122,13 @@ def haversine_km(lat1, lng1, lat2, lng2):
 
 def travel_min(lat1, lng1, lat2, lng2):
     return haversine_km(lat1,lng1,lat2,lng2)/AVG_SPEED_KMH*60
+  
+# Hàm mới — chỉ gọi sau khi SA xong
+def travel_min_accurate(lat1, lng1, lat2, lng2):
+    return osrm.travel_min(lat1, lng1, lat2, lng2)
+
+def distance_km_accurate(lat1, lng1, lat2, lng2):
+    return osrm.distance_km(lat1, lng1, lat2, lng2)
 
 def fmt(minutes):
     if minutes is None: return "?"
@@ -186,6 +196,7 @@ def load_pois():
             "price": r.get("price_mentions",""), "open_text": r.get("opening_hours_text",""), "anchor": False,
         })
     _poi_cache = pois
+    osrm.warmup_cache(pois)   # tải toàn bộ ma trận khoảng cách 1 lần
     return pois
 
 # ══════════════════════════════════════════════════════════════
@@ -197,7 +208,7 @@ def is_feasible(poi, arrive, user_end):
     end = start + poi["visit_min"]
     return (end <= poi["close_min"] and end <= user_end), start, end
 
-def simulate_day(poi_list, user_start, user_end, start_lat=None, start_lng=None):
+def simulate_day(poi_list, user_start, user_end, start_lat=None, start_lng=None, accurate=False):
     cur_time = user_start
     cur_lat = start_lat if start_lat else DALAT_CENTER[0]
     cur_lng = start_lng if start_lng else DALAT_CENTER[1]
@@ -205,10 +216,12 @@ def simulate_day(poi_list, user_start, user_end, start_lat=None, start_lng=None)
     feasible = 0
     timeline = []
     for poi in poi_list:
-        tm = travel_min(cur_lat, cur_lng, poi["lat"], poi["lng"])
+        tm = travel_min_accurate(cur_lat, cur_lng, poi["lat"], poi["lng"]) if accurate \
+             else travel_min(cur_lat, cur_lng, poi["lat"], poi["lng"])
         arrive = cur_time + tm
         ok, start, end = is_feasible(poi, arrive, user_end)
-        km = haversine_km(cur_lat, cur_lng, poi["lat"], poi["lng"])
+        km = distance_km_accurate(cur_lat, cur_lng, poi["lat"], poi["lng"]) if accurate \
+             else haversine_km(cur_lat, cur_lng, poi["lat"], poi["lng"])
         total_km += km
         timeline.append({**poi, "arrive":arrive, "start":start, "end":end, "feasible":ok, "km":round(km,2)})
         cur_time = end if ok else arrive
@@ -497,7 +510,7 @@ def optimize():
     days_data = []
     total_km=0; total_feas=0; total_stops=0
     for d, day_pois in enumerate(split_days(sa_route, num_days), 1):
-        km, feas, timeline = simulate_day(day_pois, user_start, user_end, start_lat if d==1 else None, start_lng if d==1 else None)
+        km, feas, timeline = simulate_day(day_pois, user_start, user_end, start_lat if d==1 else None, start_lng if d==1 else None, accurate=True)
         total_km+=km; total_feas+=feas; total_stops+=len(day_pois)
         color = DAY_COLORS[(d-1) % len(DAY_COLORS)]
         stops = []
@@ -573,6 +586,25 @@ def poi_types():
     pois = load_pois()
     types = sorted(set(p["type"] for p in pois))
     return jsonify([{"value": t, "label": TYPE_VI.get(t,t), "emoji": TYPE_EMOJI.get(t,"📍")} for t in types])
+  
+@app.route("/api/route_polyline", methods=["POST"])
+def route_polyline():
+    data = request.json
+    coords = data.get("coords", [])
+    if len(coords) < 2:
+        return jsonify({"polyline": []})
+    coord_str = ";".join(f"{c['lng']},{c['lat']}" for c in coords)
+    url = f"http://router.project-osrm.org/route/v1/driving/{coord_str}?overview=full&geometries=geojson"
+    try:
+        resp = requests.get(url, timeout=10)
+        result = resp.json()
+        if result.get("code") == "Ok":
+            geometry = result["routes"][0]["geometry"]["coordinates"]
+            polyline = [[p[1], p[0]] for p in geometry]
+            return jsonify({"polyline": polyline})
+    except:
+        pass
+    return jsonify({"polyline": []})
 
 @app.route("/api/feedback", methods=["POST"])
 def feedback():
@@ -1463,8 +1495,18 @@ function renderResult(data) {
       allLayers.push(marker);
     });
     if (coords.length >= 2) {
-      const line = L.polyline(coords, { color: day.color, weight: 4, opacity: 0.8, dashArray: '8 6', lineCap: 'round', lineJoin: 'round' }).addTo(map);
-      allLayers.push(line);
+      // Lấy polyline thực tế từ OSRM
+      fetch("/api/route_polyline", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ coords: coords.map(c => ({ lat: c[0], lng: c[1] })) })
+      })
+      .then(r => r.json())
+      .then(data => {
+        const points = data.polyline && data.polyline.length > 0 ? data.polyline : coords;
+        const line = L.polyline(points, { color: day.color, weight: 4, opacity: 0.8, dashArray: '8 6', lineCap: 'round', lineJoin: 'round' }).addTo(map);
+        allLayers.push(line);
+      });
     }
   });
   if (bounds.length) map.fitBounds(bounds, {padding:[40,40]});
