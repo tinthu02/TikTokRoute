@@ -60,14 +60,13 @@ def init_db():
     except sqlite3.OperationalError:
         pass  # Column already exists
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS preferences (
-        user_id TEXT,
-        category TEXT,
-        weight REAL,
-        PRIMARY KEY (user_id, category)
-    )
-    """)
+    # NOTE: bảng `preferences` (personalization phiên bản cũ, trước khi chuyển
+    # sang `user_weights`) đã bị loại bỏ khỏi init_db() vì không còn endpoint
+    # nào ghi/đọc nó (xem git history: b458e3c tạo bảng, c695845 thay thế bằng
+    # user_weights, /api/feedback bị bỏ lại mồ côi cho tới khi xóa ở đây).
+    # Nếu máy bạn đã có bảng `preferences` trong user_data.db từ trước và muốn
+    # dọn sạch luôn, chạy 1 lần (KHÔNG để trong code chạy mỗi lần khởi động app):
+    #   sqlite3 user_data.db "DROP TABLE IF EXISTS preferences;"
 
     conn.commit()
     conn.close()
@@ -605,34 +604,6 @@ def route_polyline():
     except:
         pass
     return jsonify({"polyline": []})
-
-@app.route("/api/feedback", methods=["POST"])
-def feedback():
-    data = request.json
-    user_id = data["user_id"]
-    category = data["category"]
-    rating = data["rating"]
-
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT weight FROM preferences WHERE user_id=? AND category=?
-    """, (user_id, category))
-    row = cursor.fetchone()
-    if row:
-        old_weight = row[0]
-        new_weight = min(1.0, max(0.0, old_weight + (rating / 5 - 0.5) * 0.1))
-        cursor.execute("""
-            UPDATE preferences SET weight=? WHERE user_id=? AND category=?
-        """, (new_weight, user_id, category))
-    else:
-        new_weight = rating / 5
-        cursor.execute("""
-            INSERT INTO preferences (user_id, category, weight) VALUES (?, ?, ?)
-        """, (user_id, category, new_weight))
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "feedback saved", "new_weight": new_weight})
 
 @app.route("/submit-feedback", methods=["POST"])
 def submit_feedback():
