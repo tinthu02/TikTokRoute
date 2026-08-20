@@ -717,27 +717,13 @@ body {
   background-clip: text;
   color: transparent;
 }
-.toggle-form-btn {
-  background: rgba(212,184,122,0.2);
-  border: 1px solid var(--accent);
-  border-radius: 30px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--accent);
-  cursor: pointer;
-  transition: 0.2s;
-}
-.toggle-form-btn:hover {
-  background: var(--accent);
-  color: #0a0c12;
-}
 #form-section {
   background: rgba(20,24,34,0.6);
   border-bottom: 1px solid var(--border);
   transition: max-height 0.4s ease, padding 0.3s;
   overflow-y: auto;
   padding: 0 20px;
+  max-height: 600px;
 }
 #form-section.collapsed {
   max-height: 0 !important;
@@ -1024,26 +1010,70 @@ body {
 #loading.show { display: flex; }
 .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-/* Feedback container */
+/* Feedback container — floating card góc dưới phải (trên bản đồ) */
 #feedback-container {
   display: none;
-  padding: 16px;
-  border-top: 1px solid var(--border);
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 290px;
+  z-index: 9998;
+  animation: feedbackSlideUp 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes feedbackSlideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .feedback-box {
   background: var(--surface-light);
-  border-radius: 12px;
-  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+  position: relative;
 }
-.feedback-box h3 { font-size: 14px; margin-bottom: 8px; }
+#feedback-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  background: rgba(212,184,122,0.08);
+  border-bottom: 1px solid var(--border);
+  cursor: grab;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+#feedback-drag-handle:active { cursor: grabbing; }
+.feedback-drag-dots {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-right: 6px;
+  pointer-events: none;
+}
+.feedback-body { padding: 10px 14px 12px; }
+.feedback-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.feedback-dismiss:hover { color: var(--text); }
 .stars {
   display: flex;
   gap: 4px;
-  margin: 8px 0;
+  margin: 6px 0;
 }
 .star {
   cursor: pointer;
-  font-size: 24px;
+  font-size: 22px;
   transition: 0.1s;
   display: inline-block;
 }
@@ -1178,7 +1208,6 @@ body {
 <div id="sidebar">
   <div class="sidebar-header">
     <h1>🏔 Đà Lạt Planner</h1>
-    <div class="toggle-form-btn" onclick="toggleForm()" id="toggleBtn">▲ Thu gọn</div>
   </div>
   <div id="form-section" style="max-height: 500px;">
     <div id="form-inner">
@@ -1215,7 +1244,19 @@ body {
     </div>
   </div>
 
-  <!-- Panel trọng số cá nhân -->
+  <div id="summary-bar" style="display:none;">
+    <div class="summary-item"><div class="label">Tổng km</div><div class="value" id="s-km">-</div><div class="unit">km</div></div>
+    <div class="summary-item"><div class="label">Đúng giờ</div><div class="value" id="s-rate">-</div><div class="unit">%</div></div>
+    <div class="summary-item"><div class="label">Địa điểm</div><div class="value" id="s-stops">-</div><div class="unit">/ -</div></div>
+    <button id="btn-reopen-form" onclick="toggleForm()" style="display:none;align-self:center;background:rgba(212,184,122,0.15);border:1px solid var(--accent);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--accent);cursor:pointer;white-space:nowrap;">⚙ Cài đặt</button>
+  </div>
+
+  <div id="weather-banner"></div>
+  <div id="timeline">
+    <div style="padding:40px 20px; text-align:center; color:var(--text-muted);">⬅️ Nhập thông tin và bấm tạo lộ trình</div>
+  </div>
+
+  <!-- Panel trọng số cá nhân — nằm dưới timeline -->
   <div id="weights-panel">
     <div class="wp-header">
       <span class="wp-title">🧠 Trọng số sở thích của bạn</span>
@@ -1227,30 +1268,26 @@ body {
     <div class="weight-row"><span>📸 Check-in</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-checkin" style="width:50%"></div></div><span class="weight-val" id="wv-checkin">1.00</span></div>
   </div>
 
-  <div id="summary-bar" style="display:none;">
-    <div class="summary-item"><div class="label">Tổng km</div><div class="value" id="s-km">-</div><div class="unit">km</div></div>
-    <div class="summary-item"><div class="label">Đúng giờ</div><div class="value" id="s-rate">-</div><div class="unit">%</div></div>
-    <div class="summary-item"><div class="label">Địa điểm</div><div class="value" id="s-stops">-</div><div class="unit">/ -</div></div>
-  </div>
+</div>
 
-  <div id="weather-banner"></div>
-  <div id="timeline">
-    <div style="padding:40px 20px; text-align:center; color:var(--text-muted);">⬅️ Nhập thông tin và bấm tạo lộ trình</div>
-  </div>
-
-  <div id="feedback-container">
-    <div class="feedback-box">
-      <h3>⭐ Đánh giá hành trình</h3>
-      <div class="stars">
-        <span class="star" data-value="1">⭐</span>
-        <span class="star" data-value="2">⭐</span>
-        <span class="star" data-value="3">⭐</span>
-        <span class="star" data-value="4">⭐</span>
-        <span class="star" data-value="5">⭐</span>
-      </div>
-      <textarea id="feedbackText" placeholder="Chia sẻ trải nghiệm của bạn..." style="width:100%;min-height:80px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;"></textarea>
-      <button onclick="submitFeedback()" style="margin-top:8px;width:100%;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#0a0c12;border:none;border-radius:8px;padding:10px;font-weight:700;cursor:pointer;">Gửi đánh giá</button>
-      <p id="feedbackMessage" style="margin-top:8px;color:var(--text-muted);"></p>
+<!-- Feedback floating card (ngoài sidebar, fixed góc trái dưới) -->
+<div id="feedback-container">
+  <div class="feedback-box">
+    <div id="feedback-drag-handle">
+      <span>⭐ Đánh giá hành trình</span>
+      <button class="feedback-dismiss" onclick="dismissFeedback()" title="Bỏ qua">✕</button>
+    </div>
+    <div class="feedback-body">
+    <div class="stars">
+      <span class="star" data-value="1">⭐</span>
+      <span class="star" data-value="2">⭐</span>
+      <span class="star" data-value="3">⭐</span>
+      <span class="star" data-value="4">⭐</span>
+      <span class="star" data-value="5">⭐</span>
+    </div>
+    <textarea id="feedbackText" placeholder="Chia sẻ trải nghiệm của bạn..." style="width:100%;min-height:64px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;font-size:12px;font-family:inherit;resize:none;"></textarea>
+    <button onclick="submitFeedback()" style="margin-top:8px;width:100%;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#0a0c12;border:none;border-radius:8px;padding:9px;font-weight:700;cursor:pointer;font-size:13px;">Gửi đánh giá</button>
+    <p id="feedbackMessage" style="margin-top:6px;color:var(--text-muted);font-size:11px;"></p>
     </div>
   </div>
 </div>
@@ -1293,13 +1330,13 @@ let selectedRating = 0;
 
 function toggleForm() {
   const formSection = document.getElementById('form-section');
-  const btn = document.getElementById('toggleBtn');
+  const btn = document.getElementById('btn-reopen-form');
   if (formSection.classList.contains('collapsed')) {
     formSection.classList.remove('collapsed');
-    btn.innerHTML = '▲ Thu gọn';
+    if (btn) btn.textContent = '⚙ Thu gọn';
   } else {
     formSection.classList.add('collapsed');
-    btn.innerHTML = '▼ Mở rộng';
+    if (btn) btn.textContent = '⚙ Cài đặt';
   }
 }
 
@@ -1431,8 +1468,9 @@ async function optimize() {
     const formSection = document.getElementById('form-section');
     if (!formSection.classList.contains('collapsed')) {
       formSection.classList.add('collapsed');
-      document.getElementById('toggleBtn').innerHTML = '▼ Mở rộng';
     }
+    // Hiện nút mở lại form
+    document.getElementById('btn-reopen-form').style.display = 'inline-flex';
     document.getElementById('feedback-container').style.display = 'block';
   } catch(e) { alert('Lỗi: '+e.message); }
   finally { btn.disabled=false; document.getElementById('loading').classList.remove('show'); }
@@ -1569,13 +1607,82 @@ async function submitFeedback() {
   });
   const result = await response.json();
   document.getElementById("feedbackMessage").innerText = result.message;
-  document.getElementById('feedback-container').style.display = 'none';
+  dismissFeedback();
   selectedRating = 0;
   document.getElementById("feedbackText").value = '';
   document.querySelectorAll('.star').forEach(s => s.classList.remove('selected'));
   document.getElementById("thankPopup").style.display = "flex";
 }
+function dismissFeedback() {
+  const fc = document.getElementById('feedback-container');
+  fc.style.transition = 'opacity 0.25s, transform 0.25s';
+  fc.style.opacity = '0';
+  fc.style.transform = 'translateY(10px)';
+  setTimeout(() => { fc.style.display = 'none'; fc.style.opacity = ''; fc.style.transform = ''; }, 260);
+}
 function closePopup() { document.getElementById("thankPopup").style.display = "none"; }
+
+// ── Drag & drop cho feedback card ──────────────────────────────
+(function initFeedbackDrag() {
+  const fc = document.getElementById('feedback-container');
+  const handle = document.getElementById('feedback-drag-handle');
+  let dragging = false, ox = 0, oy = 0;
+
+  handle.addEventListener('mousedown', e => {
+    dragging = true;
+    // Nếu đang dùng bottom/right, chuyển sang top/left tuyệt đối
+    if (fc.style.top === '') {
+      const rect = fc.getBoundingClientRect();
+      fc.style.top  = rect.top  + 'px';
+      fc.style.left = rect.left + 'px';
+      fc.style.bottom = 'unset';
+      fc.style.right  = 'unset';
+    }
+    ox = e.clientX - fc.getBoundingClientRect().left;
+    oy = e.clientY - fc.getBoundingClientRect().top;
+    fc.style.transition = 'none';
+    fc.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  // Touch support
+  handle.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    dragging = true;
+    if (fc.style.top === '') {
+      const rect = fc.getBoundingClientRect();
+      fc.style.top  = rect.top  + 'px';
+      fc.style.left = rect.left + 'px';
+      fc.style.bottom = 'unset';
+      fc.style.right  = 'unset';
+    }
+    ox = t.clientX - fc.getBoundingClientRect().left;
+    oy = t.clientY - fc.getBoundingClientRect().top;
+    fc.style.transition = 'none';
+    e.preventDefault();
+  }, { passive: false });
+
+  function onMove(cx, cy) {
+    if (!dragging) return;
+    let nx = cx - ox;
+    let ny = cy - oy;
+    // Giữ trong viewport
+    nx = Math.max(0, Math.min(window.innerWidth  - fc.offsetWidth,  nx));
+    ny = Math.max(0, Math.min(window.innerHeight - fc.offsetHeight, ny));
+    fc.style.left = nx + 'px';
+    fc.style.top  = ny + 'px';
+  }
+
+  document.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+  document.addEventListener('touchmove', e => { if(dragging) onMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+
+  function stopDrag() {
+    dragging = false;
+    fc.style.userSelect = '';
+  }
+  document.addEventListener('mouseup',  stopDrag);
+  document.addEventListener('touchend', stopDrag);
+})();
 
 // ── Trọng số cá nhân ──────────────────────────────────────────
 // Chuyển weight (0.5-2.0) → % thanh (0-100%)
