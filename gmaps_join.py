@@ -19,10 +19,12 @@ tăng FUZZY_THRESHOLD từ 60 lên 65 để match chính xác hơn
 =============================================================
 """
 
-import csv, json, os, time, re
+import csv, json, os, time, re, argparse
 import requests
 from dotenv import load_dotenv
 from rapidfuzz import fuzz
+
+import gmaps_cache as cache
 
 load_dotenv()
 
@@ -57,7 +59,9 @@ GMAPS_DETAIL_URL = "https://maps.googleapis.com/maps/api/place/details/json"
 # ══════════════════════════════════════════════════════════════
 
 def search_place(place_name):
-    """Tìm địa điểm trên Google Maps, ưu tiên kết quả trong vùng Đà Lạt"""
+    """Tìm địa điểm trên Google Maps, ưu tiên kết quả trong vùng Đà Lạt.
+    Trả về (results, status) với status in {"success", "zero_results", "error"} —
+    tách rõ zero_results (kết quả hợp lệ, không nên retry) khỏi error (nên retry)."""
     query = f"{place_name} Đà Lạt"
     params = {
         "query":    query,
@@ -71,15 +75,31 @@ def search_place(place_name):
         r.raise_for_status()
         data = r.json()
         if data.get("status") == "OK":
-            return data.get("results", [])
+            return data.get("results", []), "success"
         elif data.get("status") == "ZERO_RESULTS":
-            return []
+            return [], "zero_results"
         else:
             print(f"    API error: {data.get('status')} - {data.get('error_message', '')}")
-            return []
+            return [], "error"
     except Exception as e:
         print(f"    Request error: {str(e)[:60]}")
-        return []
+        return [], "error"
+
+
+def search_place_cached(place_name, stats):
+    """Wrapper có cache quanh search_place — chỉ gọi API nếu chưa có trong cache
+    (hoặc lần trước bị 'error' và đang chạy --retry-errors)."""
+    key = cache.make_key(place_name)
+    cached_candidates, cached_status = cache.get_search_cached(key)
+
+    if cached_status is not None:
+        stats["search_from_cache"] += 1
+        return cached_candidates, cached_status
+
+    candidates, status = search_place(place_name)
+    stats["search_api_calls"] += 1
+    cache.save_search_cache(key, place_name, candidates, status)
+    return candidates, status
 
 
 def get_place_details(place_id):
@@ -100,6 +120,23 @@ def get_place_details(place_id):
     except Exception as e:
         print(f"    Detail error: {str(e)[:60]}")
         return {}
+
+
+def get_place_details_cached(place_id, stats):
+    """Wrapper có cache quanh get_place_details — key theo place_id nên nhiều POI
+    trùng địa điểm (sau fuzzy match) chỉ tốn 1 lần gọi API detail."""
+    detail, status = cache.get_detail_cached(place_id)
+
+    if status is not None:
+        stats["detail_from_cache"] += 1
+        return detail
+
+    detail = get_place_details(place_id)
+    time.sleep(REQUEST_DELAY)
+    stats["detail_api_calls"] += 1
+    status = "success" if detail else "error"
+    cache.save_detail_cache(place_id, detail, status)
+    return detail
 
 # ══════════════════════════════════════════════════════════════
 # BƯỚC 2 — FUZZY MATCH
@@ -214,10 +251,38 @@ def save_csv(data, filepath):
     print(f"  Đã lưu {len(data)} dòng -> {filepath}")
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Giai đoạn 3 — Join POI với Google Maps")
+    parser.add_argument("--retry-errors", action="store_true",
+                         help="Xóa các entry 'error' trong cache rồi gọi lại API CHỈ cho các POI đó")
+    parser.add_argument("--no-cache", action="store_true",
+                         help="Bỏ qua cache hoàn toàn, gọi lại API cho mọi POI (tương đương --force cũ)")
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
     print("\n" + "="*55)
     print("  GIAI ĐOẠN 3 — Join POI với Google Maps")
     print("="*55)
+
+    if args.no_cache:
+        # Xóa hẳn DB cache để đảm bảo mọi request đều gọi lại API
+        if os.path.exists(cache.CACHE_DB):
+            os.remove(cache.CACHE_DB)
+        print("  (--no-cache) Đã xóa cache, sẽ gọi lại API cho toàn bộ POI")
+
+    cache.init_cache()
+
+    if args.retry_errors:
+        n_search, n_detail = cache.clear_errors()
+        print(f"  (--retry-errors) Đã xóa {n_search} search-cache lỗi, {n_detail} detail-cache lỗi")
+
+    stats = {
+        "search_from_cache": 0, "search_api_calls": 0,
+        "detail_from_cache": 0, "detail_api_calls": 0,
+    }
 
     pois = load_csv(INPUT_CSV)
     print(f"\nĐọc {len(pois)} POI từ {INPUT_CSV}")
@@ -230,9 +295,13 @@ def main():
         name = poi["place_name"]
         print(f"\n  [{i}/{total}] {name}")
 
-        # Tìm trên Google Maps
-        candidates = search_place(name)
-        time.sleep(REQUEST_DELAY)
+        # Tìm trên Google Maps (có cache — chỉ gọi API nếu chưa có / đang retry lỗi)
+        candidates, search_status = search_place_cached(name, stats)
+
+        if search_status == "error":
+            print(f"    -> Lỗi khi tìm kiếm (đã cache là error, dùng --retry-errors để thử lại)")
+            unmatched.append({**poi, "reason": "search_error"})
+            continue
 
         if not candidates:
             print(f"    -> Không tìm thấy")
@@ -257,10 +326,9 @@ def main():
             unmatched.append({**poi, "reason": "out_of_dalat"})
             continue
 
-        # Lấy chi tiết
+        # Lấy chi tiết (có cache theo place_id)
         place_id = best.get("place_id", "")
-        detail   = get_place_details(place_id) if place_id else {}
-        time.sleep(REQUEST_DELAY)
+        detail   = get_place_details_cached(place_id, stats) if place_id else {}
 
         loc = best.get("geometry", {}).get("location", {})
         weekday_text, open_time, close_time = parse_opening_hours(detail)
@@ -291,6 +359,15 @@ def main():
     print("\n" + "="*55)
     print(f"  MATCH:   {len(matched)}/{total} ({round(len(matched)/total*100)}%)")
     print(f"  NO MATCH: {len(unmatched)}/{total}")
+
+    print(f"\n  Cache — search: {stats['search_from_cache']} lấy từ cache, "
+          f"{stats['search_api_calls']} gọi API mới")
+    print(f"  Cache — detail: {stats['detail_from_cache']} lấy từ cache, "
+          f"{stats['detail_api_calls']} gọi API mới")
+    cs = cache.cache_stats()
+    if cs["search_error"] or cs["detail_error"]:
+        print(f"  Còn lỗi trong cache: search_error={cs['search_error']}, "
+              f"detail_error={cs['detail_error']} -> chạy lại với --retry-errors")
 
     save_csv(matched,   OUTPUT_MATCHED)
     save_csv(unmatched, OUTPUT_UNMATCHED)
