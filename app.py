@@ -43,6 +43,17 @@ def init_db():
     """)
 
     cur.execute("""
+    CREATE TABLE IF NOT EXISTS routes (
+        route_id TEXT PRIMARY KEY,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        num_days INTEGER,
+        total_km REAL,
+        total_stops INTEGER,
+        poi_names TEXT
+    )
+    """)
+
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS user_weights (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_token TEXT,
@@ -336,6 +347,19 @@ def update_user_weights(user_token, selected_types, increase=None):
 
     return {"cafe": cafe_w, "nature": nature_w, "food": food_w, "checkin": checkin_w}
 
+def save_route_meta(route_id, num_days, total_km, total_stops, poi_names):
+    """Lưu metadata của route vừa tạo, để feedback gửi sau đó join lại được
+    với đúng nội dung route (thay vì route_id cố định 'dalat_route' như trước)."""
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO routes (route_id, num_days, total_km, total_stops, poi_names)
+           VALUES (?, ?, ?, ?, ?)""",
+        (route_id, num_days, total_km, total_stops, "|".join(poi_names))
+    )
+    conn.commit()
+    conn.close()
+
 def greedy(pois, user_start, user_end, start_lat=None, start_lng=None, user_token=None):
     unvisited = list(pois); route = []
     cur_lat = start_lat if start_lat else DALAT_CENTER[0]
@@ -498,6 +522,7 @@ def optimize():
     g_route = greedy(pois, user_start, user_end, start_lat, start_lng, user_token)
     if not g_route:
         return jsonify({
+            "route_id": None,
             "days": [],
             "summary": {
                 "total_km": 0, "feasible": 0, "total_stops": 0,
@@ -524,7 +549,12 @@ def optimize():
             })
         days_data.append({"day": d, "color": color, "km": round(km,1), "feasible": feas, "total": len(day_pois), "stops": stops})
 
+    route_id = str(uuid4())
+    poi_names_flat = [s["name"] for d in days_data for s in d["stops"]]
+    save_route_meta(route_id, num_days, round(total_km, 1), total_stops, poi_names_flat)
+
     return jsonify({
+        "route_id": route_id,
         "days": days_data,
         "summary": {
             "total_km": round(total_km,1), "feasible": total_feas, "total_stops": total_stops,
@@ -610,7 +640,7 @@ def submit_feedback():
     data = request.json or {}
     rating = data.get("rating")
     feedback_text = data.get("feedback", "")
-    route_id = data.get("route_id", "default")
+    route_id = data.get("route_id") or "unknown"
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute(
@@ -1298,6 +1328,7 @@ let startLocation = null;
 let pickingStartLocation = false;
 let startMarker = null;
 let selectedRating = 0;
+let currentRouteId = null;
 
 function toggleForm() {
   const formSection = document.getElementById('form-section');
@@ -1448,6 +1479,7 @@ async function optimize() {
 }
 
 function renderResult(data) {
+  currentRouteId = data.route_id || null;
   allLayers.forEach(l => map.removeLayer(l));
   allLayers = [];
   const s = data.summary;
@@ -1574,7 +1606,7 @@ async function submitFeedback() {
   const response = await fetch("/submit-feedback", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ rating: selectedRating, feedback: feedback, route_id: "dalat_route" })
+    body: JSON.stringify({ rating: selectedRating, feedback: feedback, route_id: currentRouteId })
   });
   const result = await response.json();
   document.getElementById("feedbackMessage").innerText = result.message;
