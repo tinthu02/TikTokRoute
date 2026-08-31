@@ -53,6 +53,7 @@ def load_route_metrics(filepath):
     }
 
 def random_baseline(pois_file, num_days=3, user_start=7*60, user_end=21*60):
+    random.seed(42)
     df_poi = pd.read_csv(pois_file, encoding="utf-8-sig")
     df_poi = df_poi[df_poi['include_in_route'].astype(str).str.lower().isin(['true', '1'])]
     df_poi = df_poi.dropna(subset=['lat', 'lng'])
@@ -111,6 +112,7 @@ def random_baseline(pois_file, num_days=3, user_start=7*60, user_end=21*60):
     }
 
 def main():
+    random.seed(42)
     files = {
         'Greedy 3D': 'dalat_route_greedy_3d.csv',
         'SA Phase1': 'dalat_route_phase1.csv',
