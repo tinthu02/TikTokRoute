@@ -9,9 +9,14 @@ GIAI ĐOẠN 5 — Tối ưu lộ trình du lịch Đà Lạt (có tích hợp t
 =============================================================
 """
 
-import csv, math, random, time, copy
+import csv, math, random, time, copy, os, sys
 import numpy as np
-from weather import get_rainy_days  # thêm dòng này
+
+# Cho phép import package `common/` ở thư mục gốc repo, bất kể script này
+# được chạy bằng `python routing/route_optimizer.py` từ đâu, hay bị
+# full_pipeline.py gọi bằng subprocess.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from common.weather import get_rainy_days  # thêm dòng này
 import argparse
 
 # ══════════════════════════════════════════════════════════════

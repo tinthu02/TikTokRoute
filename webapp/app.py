@@ -4,7 +4,7 @@ GIAI ĐOẠN 7 — Web App lộ trình Đà Lạt (bố cục thông minh)
 =============================================================
 Yêu cầu: pip install flask folium
 
-Chạy: python app.py
+Chạy: python webapp/app.py  (chạy từ thư mục gốc repo)
 Mở trình duyệt: http://localhost:5000
 =============================================================
 
@@ -18,12 +18,17 @@ feat: tích hợp form đánh giá hành trình (feedback) và thông báo popup
 """
 
 from flask import Flask, render_template_string, request, jsonify, make_response
-import csv, math, random, json, os, sqlite3
+import csv, math, random, json, os, sqlite3, sys
 from uuid import uuid4
 
 import requests
-from weather import get_rainy_days
-import osrm
+
+# Cho phép import package `common/` ở thư mục gốc repo, bất kể app.py được
+# chạy bằng `python webapp/app.py` từ đâu (CWD nào) hay bị full_pipeline.py
+# gọi bằng subprocess.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from common.weather import get_rainy_days
+from common import osrm
 
 # SQLite database file
 DB_NAME = "user_data.db"
@@ -1871,7 +1876,7 @@ loadInitialWeights();
 if __name__ == "__main__":
     if not os.path.exists(POI_CSV):
         print(f"❌ Không tìm thấy {POI_CSV}")
-        print("   Chạy scoring.py trước để tạo file này.")
+        print("   Chạy scoring/scoring.py trước để tạo file này.")
     else:
         print("\n" + "="*50)
         print("  🏔  Đà Lạt Route Planner (bố cục thông minh)")
