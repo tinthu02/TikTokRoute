@@ -13,9 +13,12 @@ import csv
 import json
 import time
 import logging
+import argparse
 import urllib.request
 import urllib.error
 from pathlib import Path
+
+import sentiment_cache as cache
 
 # ──────────────────────────────────────────────
 # CẤU HÌNH
@@ -151,13 +154,36 @@ def analyze_sentiment(place_name: str, caption: str) -> dict:
 # ──────────────────────────────────────────────
 # MAIN PIPELINE
 # ──────────────────────────────────────────────
+def parse_args():
+    parser = argparse.ArgumentParser(description="Sentiment analysis cho POI Đà Lạt")
+    parser.add_argument("--retry-errors", action="store_true",
+                         help="Xóa các entry 'error' trong cache rồi phân tích lại CHỈ cho các POI đó")
+    parser.add_argument("--no-cache", action="store_true",
+                         help="Bỏ qua cache hoàn toàn, phân tích lại toàn bộ POI")
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
     input_path  = Path(INPUT_FILE)
     output_path = Path(OUTPUT_FILE)
 
     if not input_path.exists():
         log.error(f"Không tìm thấy file input: {input_path}")
         raise FileNotFoundError(input_path)
+
+    if args.no_cache:
+        import os
+        if os.path.exists(cache.CACHE_DB):
+            os.remove(cache.CACHE_DB)
+        log.info("(--no-cache) Đã xóa cache, sẽ phân tích lại toàn bộ POI")
+
+    cache.init_cache()
+
+    if args.retry_errors:
+        n = cache.clear_errors()
+        log.info(f"(--retry-errors) Đã xóa {n} entry lỗi trong cache")
 
     # Đọc CSV
     with open(input_path, encoding="utf-8-sig") as f:
@@ -180,14 +206,29 @@ def main():
 
     results = []
     total   = len(rows)
+    from_cache = 0
+    api_calls  = 0
 
     for i, row in enumerate(rows, 1):
         place_name = row.get("place_name", f"POI_{i}").strip()
         caption    = row.get("video_caption", "") or ""
 
-        log.info(f"[{i}/{total}] {place_name}")
+        item_key = cache.make_key(place_name, caption)
+        cached_result, status = cache.get_cached(item_key)
 
-        sentiment = analyze_sentiment(place_name, caption)
+        if status is not None:
+            sentiment = cached_result
+            from_cache += 1
+            log.info(f"[{i}/{total}] {place_name} → (cache) {sentiment['label']} ({sentiment['score']:+.2f})")
+        else:
+            log.info(f"[{i}/{total}] {place_name}")
+            sentiment = analyze_sentiment(place_name, caption)
+            api_calls += 1
+            # ollama_error sau khi hết retry -> đáng để --retry-errors thử lại sau;
+            # các trường hợp khác (caption rỗng, parse lỗi format) coi là kết quả hợp lệ,
+            # không cần gọi lại vì Ollama đã phản hồi/đã xử lý xong.
+            entry_status = "error" if sentiment["reason"] == "ollama_error" else "success"
+            cache.save_cache(item_key, place_name, sentiment, entry_status)
 
         row["sentiment_score"]  = round(sentiment["score"], 4)
         row["sentiment_label"]  = sentiment["label"]
@@ -196,11 +237,12 @@ def main():
 
         results.append(row)
 
-        # Nhỏ nghỉ giữa các request để không overload Ollama
-        if i < total:
+        # Nhỏ nghỉ giữa các request THẬT SỰ gọi Ollama (không cần nghỉ khi lấy từ cache)
+        if status is None and i < total:
             time.sleep(0.3)
 
-    # Ghi output
+    # Ghi output — luôn ghi lại từ toàn bộ `results` (cache + mới), an toàn kể cả khi
+    # chạy rải rác nhiều lần
     with open(output_path, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=out_fields, extrasaction="ignore")
         writer.writeheader()
@@ -216,6 +258,10 @@ def main():
     log.info(f"✅ Hoàn thành! Ghi {len(results)} dòng → {output_path.name}")
     log.info(f"   Positive : {pos}  |  Neutral : {neutral}  |  Negative : {neg}")
     log.info(f"   Avg score: {avg_score:+.3f}")
+    log.info(f"   Cache: {from_cache} lấy từ cache, {api_calls} gọi Ollama mới")
+    cs = cache.cache_stats()
+    if cs["errors"]:
+        log.info(f"   Còn {cs['errors']} POI lỗi trong cache -> chạy lại với --retry-errors")
     log.info("─" * 50)
 
 

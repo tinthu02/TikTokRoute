@@ -1879,4 +1879,4 @@ if __name__ == "__main__":
         print(f"  Mở trình duyệt: http://localhost:5000")
         print("  Ctrl+C để dừng server")
         print("="*50 + "\n")
-        app.run(debug=False, port=5000)
+        app.run(debug=False, port=5000)  
