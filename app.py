@@ -49,9 +49,16 @@ def init_db():
         num_days INTEGER,
         total_km REAL,
         total_stops INTEGER,
-        poi_names TEXT
+        poi_names TEXT,
+        user_token TEXT
     )
     """)
+    # Migrate existing DBs: add user_token if missing (cần để join feedback → user_weights)
+    try:
+        cur.execute("ALTER TABLE routes ADD COLUMN user_token TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS user_weights (
@@ -256,6 +263,7 @@ def route_cost(route, num_days, user_start, user_end, start_lat=None, start_lng=
 WEIGHT_BOUNDS = (0.5, 2.0)
 WEIGHT_INCREASE = 0.1   # khi category được chọn
 WEIGHT_DECAY    = 0.03  # khi category không được chọn
+WEIGHT_FEEDBACK_DELTA = 0.15  # tín hiệu từ rating sao (route_feedback) — mạnh hơn decay, ngang sở thích
 
 def _clamp_weight(w):
     return max(WEIGHT_BOUNDS[0], min(WEIGHT_BOUNDS[1], w))
@@ -347,15 +355,118 @@ def update_user_weights(user_token, selected_types, increase=None):
 
     return {"cafe": cafe_w, "nature": nature_w, "food": food_w, "checkin": checkin_w}
 
-def save_route_meta(route_id, num_days, total_km, total_stops, poi_names):
-    """Lưu metadata của route vừa tạo, để feedback gửi sau đó join lại được
-    với đúng nội dung route (thay vì route_id cố định 'dalat_route' như trước)."""
+def _poi_type_to_category(poi_type):
+    """Map type POI thô (cafe, thiên nhiên, nhà hàng...) sang 1 trong 4 category
+    trọng số cá nhân hóa (cafe/nature/food/checkin), dùng chung logic với get_user_weight."""
+    if poi_type == "cafe":
+        return "cafe"
+    if poi_type == "thiên nhiên":
+        return "nature"
+    if poi_type in ("nhà hàng", "chợ quán", "quán ăn"):
+        return "food"
+    if poi_type == "địa điểm checkin":
+        return "checkin"
+    return None
+
+def get_route_info(route_id):
+    """Lấy lại (user_token, poi_names) đã lưu khi tạo route, để join với feedback."""
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT user_token, poi_names FROM routes WHERE route_id=?", (route_id,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return None, []
+    user_token, poi_names_str = row
+    poi_names = poi_names_str.split("|") if poi_names_str else []
+    return user_token, poi_names
+
+def categories_in_route(poi_names):
+    """Từ danh sách tên POI của 1 route, suy ra tập category (cafe/nature/food/checkin)
+    xuất hiện trong route đó, bằng cách tra ngược type qua load_pois()."""
+    if not poi_names:
+        return set()
+    name_to_type = {p["name"]: p["type"] for p in load_pois()}
+    cats = set()
+    for name in poi_names:
+        cat = _poi_type_to_category(name_to_type.get(name))
+        if cat:
+            cats.add(cat)
+    return cats
+
+def apply_feedback_to_weights(route_id, rating):
+    """
+    ĐÂY LÀ PHẦN TRƯỚC ĐÂY BỊ THIẾU: đọc lại route_feedback và dùng rating (1-5)
+    để cập nhật trọng số cá nhân hóa — thay vì trọng số chỉ dựa vào việc người
+    dùng có tick chọn loại địa điểm hay không.
+
+    rating >= 4 → người dùng hài lòng → tăng trọng số các category có trong route đó
+    rating <= 2 → người dùng không hài lòng → giảm trọng số các category đó
+    rating == 3 (hoặc thiếu/không hợp lệ) → trung lập, không đổi
+    """
+    try:
+        rating = int(rating)
+    except (TypeError, ValueError):
+        return
+    if rating not in (1, 2, 3, 4, 5) or rating == 3:
+        return
+
+    user_token, poi_names = get_route_info(route_id)
+    if not user_token:
+        return  # route cũ (trước migration) không có user_token → bỏ qua an toàn
+
+    cats = categories_in_route(poi_names)
+    if not cats:
+        return
+
+    delta = WEIGHT_FEEDBACK_DELTA if rating >= 4 else -WEIGHT_FEEDBACK_DELTA
+
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute(
-        """INSERT INTO routes (route_id, num_days, total_km, total_stops, poi_names)
-           VALUES (?, ?, ?, ?, ?)""",
-        (route_id, num_days, total_km, total_stops, "|".join(poi_names))
+        "SELECT cafe_weight, nature_weight, food_weight, checkin_weight FROM user_weights WHERE user_token=?",
+        (user_token,)
+    )
+    row = cur.fetchone()
+    if not row:
+        cur.execute(
+            "INSERT INTO user_weights (user_token, cafe_weight, nature_weight, food_weight, checkin_weight) VALUES (?,1.0,1.0,1.0,1.0)",
+            (user_token,)
+        )
+        conn.commit()
+        cafe_w, nature_w, food_w, checkin_w = 1.0, 1.0, 1.0, 1.0
+    else:
+        cafe_w, nature_w, food_w, checkin_w = row
+
+    if "cafe" in cats:    cafe_w    = _clamp_weight(cafe_w + delta)
+    if "nature" in cats:  nature_w  = _clamp_weight(nature_w + delta)
+    if "food" in cats:    food_w    = _clamp_weight(food_w + delta)
+    if "checkin" in cats: checkin_w = _clamp_weight(checkin_w + delta)
+
+    cur.execute(
+        """UPDATE user_weights
+           SET cafe_weight=?, nature_weight=?, food_weight=?, checkin_weight=?,
+               updated_at=CURRENT_TIMESTAMP
+           WHERE user_token=?""",
+        (cafe_w, nature_w, food_w, checkin_w, user_token)
+    )
+    conn.commit()
+    conn.close()
+
+    token_short = user_token[:8]
+    print(f"  [Weights/feedback★{rating}] user={token_short}… categories={cats} delta={delta:+.2f} "
+          f"→ ☕{cafe_w:.2f} 🌿{nature_w:.2f} 🍜{food_w:.2f} 📸{checkin_w:.2f}")
+
+def save_route_meta(route_id, num_days, total_km, total_stops, poi_names, user_token=None):
+    """Lưu metadata của route vừa tạo, để feedback gửi sau đó join lại được
+    với đúng nội dung route (thay vì route_id cố định 'dalat_route' như trước).
+    Lưu kèm user_token để khi có feedback biết phải cập nhật trọng số cho ai."""
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO routes (route_id, num_days, total_km, total_stops, poi_names, user_token)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (route_id, num_days, total_km, total_stops, "|".join(poi_names), user_token)
     )
     conn.commit()
     conn.close()
@@ -551,7 +662,7 @@ def optimize():
 
     route_id = str(uuid4())
     poi_names_flat = [s["name"] for d in days_data for s in d["stops"]]
-    save_route_meta(route_id, num_days, round(total_km, 1), total_stops, poi_names_flat)
+    save_route_meta(route_id, num_days, round(total_km, 1), total_stops, poi_names_flat, user_token)
 
     return jsonify({
         "route_id": route_id,
@@ -649,6 +760,10 @@ def submit_feedback():
     )
     conn.commit()
     conn.close()
+
+    # Đọc lại rating vừa lưu để cập nhật trọng số cá nhân hóa (trước đây bị bỏ sót)
+    apply_feedback_to_weights(route_id, rating)
+
     return jsonify({"success": True, "message": "Cảm ơn bạn đã đánh giá hành trình!"})
 
 # ══════════════════════════════════════════════════════════════
