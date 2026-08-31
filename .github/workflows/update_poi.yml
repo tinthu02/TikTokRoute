@@ -31,6 +31,15 @@ jobs:
         run: |
           python full_pipeline.py
 
+      - name: Upload pipeline log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-log-${{ github.run_id }}
+          path: logs/*.log
+          retention-days: 90
+          if-no-files-found: warn
+
       - name: Commit and push updated files
         run: |
           git config user.name "github-actions[bot]"
