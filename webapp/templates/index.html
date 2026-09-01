@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Đà Lạt Route Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div id="sidebar">
+  <div class="sidebar-header">
+    <h1>🏔 Đà Lạt Planner</h1>
+  </div>
+  <div id="form-section" style="max-height: 500px;">
+    <div id="form-inner">
+      <div class="form-row-compact">
+        <div class="form-group"><label>Số ngày</label><input type="number" id="num_days" value="3" min="1" max="5"></div>
+        <div class="form-group"><label>Số POI</label><input type="number" id="top_k" value="40" min="10" max="80"></div>
+        <div class="form-group"><label>Bắt đầu</label><select id="start_hour"><option value="6">06:00</option><option value="7" selected>07:00</option><option value="8">08:00</option><option value="9">09:00</option></select></div>
+        <div class="form-group"><label>Kết thúc</label><select id="end_hour"><option value="19">19:00</option><option value="20">20:00</option><option value="21" selected>21:00</option><option value="22">22:00</option></select></div>
+      </div>
+      <label>🧭 Sở thích du lịch</label>
+      <div class="preference-group">
+        <label><input type="checkbox" id="pref_adventure"> 🏔 Mạo hiểm</label>
+        <label><input type="checkbox" id="pref_relax"> 🌿 Thư giãn</label>
+        <label><input type="checkbox" id="pref_food"> 🍜 Ăn uống</label>
+        <label><input type="checkbox" id="pref_checkin"> 📸 Check-in</label>
+      </div>
+      <label>Loại địa điểm</label>
+      <div id="type-filters"><div class="type-pill active" data-type="all">✨ Tất cả</div></div>
+      <label>📌 Điểm bắt buộc</label>
+      <div id="anchor-section">
+        <div style="position:relative;"><input type="text" id="anchor-input" placeholder="Tìm địa điểm..." autocomplete="off"><div id="anchor-drop"></div></div>
+        <div id="anchor-tags" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;"></div>
+      </div>
+      <div id="start-location-section">
+        <label>📍 Điểm xuất phát</label>
+        <div class="sl-row">
+          <div class="sl-badge" id="sl-badge">🏔 Mặc định: Trung tâm Đà Lạt</div>
+          <button class="sl-btn" onclick="detectLocation()">📡 Vị trí của tôi</button>
+          <button class="sl-btn" onclick="pickOnMap()">🗺 Chọn trên bản đồ</button>
+          <button class="sl-btn" id="sl-clear" onclick="clearStartLocation()" style="display:none;">✕</button>
+        </div>
+      </div>
+      <button id="btn-optimize" onclick="optimize()">🗺 Tối ưu lộ trình</button>
+    </div>
+  </div>
+
+  <div id="summary-bar" style="display:none;">
+    <div class="summary-item"><div class="label">Tổng km</div><div class="value" id="s-km">-</div><div class="unit">km</div></div>
+    <div class="summary-item"><div class="label">Đúng giờ</div><div class="value" id="s-rate">-</div><div class="unit">%</div></div>
+    <div class="summary-item"><div class="label">Địa điểm</div><div class="value" id="s-stops">-</div><div class="unit">/ -</div></div>
+    <button id="btn-reopen-form" onclick="toggleForm()" style="display:none;align-self:center;background:rgba(212,184,122,0.15);border:1px solid var(--accent);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--accent);cursor:pointer;white-space:nowrap;">⚙ Cài đặt</button>
+  </div>
+
+  <div id="weather-banner"></div>
+  <div id="timeline">
+    <div style="padding:40px 20px; text-align:center; color:var(--text-muted);">⬅️ Nhập thông tin và bấm tạo lộ trình</div>
+  </div>
+
+  <!-- Panel trọng số cá nhân — nằm dưới timeline -->
+  <div id="weights-panel">
+    <div class="wp-header">
+      <span class="wp-title">🧠 Trọng số sở thích của bạn</span>
+      <button class="wp-reset" onclick="resetWeights()">↺ Reset</button>
+    </div>
+    <div class="weight-row"><span>☕ Cà phê</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-cafe" style="width:50%"></div></div><span class="weight-val" id="wv-cafe">1.00</span></div>
+    <div class="weight-row"><span>🌿 Thiên nhiên</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-nature" style="width:50%"></div></div><span class="weight-val" id="wv-nature">1.00</span></div>
+    <div class="weight-row"><span>🍜 Ăn uống</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-food" style="width:50%"></div></div><span class="weight-val" id="wv-food">1.00</span></div>
+    <div class="weight-row"><span>📸 Check-in</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-checkin" style="width:50%"></div></div><span class="weight-val" id="wv-checkin">1.00</span></div>
+  </div>
+
+</div>
+
+<!-- Feedback floating card (ngoài sidebar, fixed góc trái dưới) -->
+<div id="feedback-container">
+  <div class="feedback-box">
+    <div id="feedback-drag-handle">
+      <span>⭐ Đánh giá hành trình</span>
+      <button class="feedback-dismiss" onclick="dismissFeedback()" title="Bỏ qua">✕</button>
+    </div>
+    <div class="feedback-body">
+    <div class="stars">
+      <span class="star" data-value="1">⭐</span>
+      <span class="star" data-value="2">⭐</span>
+      <span class="star" data-value="3">⭐</span>
+      <span class="star" data-value="4">⭐</span>
+      <span class="star" data-value="5">⭐</span>
+    </div>
+    <textarea id="feedbackText" placeholder="Chia sẻ trải nghiệm của bạn..." style="width:100%;min-height:64px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;font-size:12px;font-family:inherit;resize:none;"></textarea>
+    <button onclick="submitFeedback()" style="margin-top:8px;width:100%;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#0a0c12;border:none;border-radius:8px;padding:9px;font-weight:700;cursor:pointer;font-size:13px;">Gửi đánh giá</button>
+    <p id="feedbackMessage" style="margin-top:6px;color:var(--text-muted);font-size:11px;"></p>
+    </div>
+  </div>
+</div>
+
+<div id="map-container">
+  <div id="loading"><div class="spinner"></div><p>Đang tính toán lộ trình...</p></div>
+  <div id="map"></div>
+</div>
+
+<!-- Toast trọng số -->
+<div id="weight-toast">
+  <div class="toast-title">🧠 Hồ sơ sở thích đã cập nhật</div>
+  <div class="weight-row"><span>☕ Cà phê</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-cafe" style="width:50%"></div></div><span class="weight-arrow" id="twa-cafe"></span><span class="weight-val" id="twv-cafe">1.00</span></div>
+  <div class="weight-row"><span>🌿 Thiên nhiên</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-nature" style="width:50%"></div></div><span class="weight-arrow" id="twa-nature"></span><span class="weight-val" id="twv-nature">1.00</span></div>
+  <div class="weight-row"><span>🍜 Ăn uống</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-food" style="width:50%"></div></div><span class="weight-arrow" id="twa-food"></span><span class="weight-val" id="twv-food">1.00</span></div>
+  <div class="weight-row"><span>📸 Check-in</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-checkin" style="width:50%"></div></div><span class="weight-arrow" id="twa-checkin"></span><span class="weight-val" id="twv-checkin">1.00</span></div>
+</div>
+
+<div id="thankPopup" class="popup">
+  <div class="popup-content">
+    <h2>💖 Cảm ơn bạn!</h2>
+    <p>Chúc bạn có trải nghiệm tuyệt vời cùng TikTokRoute!</p>
+    <button onclick="closePopup()">Đóng</button>
+  </div>
+</div>
+
+<script>
+  // Truyền user_token (đọc từ cookie phía server) sang file JS tĩnh —
+  // static/js/app.js không đi qua Jinja nên không thể chèn biến Jinja vào
+  // đó trực tiếp; đây là cầu nối nhỏ gọn thay cho cách cũ (nhúng thẳng
+  // trong <script> giữa file app.py).
+  window.USER_TOKEN = "{{ user_token }}";
+</script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

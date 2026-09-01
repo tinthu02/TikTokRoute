@@ -12,11 +12,12 @@ GIAI ĐOẠN 5 — Tối ưu lộ trình du lịch Đà Lạt (có tích hợp t
 import csv, math, random, time, copy, os, sys
 import numpy as np
 
-# Cho phép import package `common/` ở thư mục gốc repo, bất kể script này
-# được chạy bằng `python routing/route_optimizer.py` từ đâu, hay bị
-# full_pipeline.py gọi bằng subprocess.
+# Cho phép import package `common/` và `routing/` ở thư mục gốc repo, bất kể
+# script này được chạy bằng `python routing/route_optimizer.py` từ đâu, hay
+# bị full_pipeline.py gọi bằng subprocess.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from common.weather import get_rainy_days  # thêm dòng này
+from routing import core as rcore  # thuật toán/tiện ích lõi dùng chung với webapp/app.py
 import argparse
 
 # ══════════════════════════════════════════════════════════════
@@ -50,80 +51,24 @@ FOOD_TYPES = {"chợ quán", "nhà hàng", "quán ăn", "ăn_uống"}
 # Các loại POI ngoài trời (sẽ bị loại nếu trời mưa)
 OUTDOOR_TYPES = {"thiên nhiên", "địa điểm checkin"}  # check-in thường ngoài trời
 
-DEFAULT_HOURS_BY_TYPE = {
-    "thiên nhiên":      (7*60,  18*60),
-    "địa điểm checkin": (6*60,  20*60),
-    "cafe":             (7*60,  22*60),
-    "nhà hàng":         (10*60, 22*60),
-    "chợ quán":         (6*60,  22*60),
-    "khác":             (7*60,  21*60),
-}
-
 # ══════════════════════════════════════════════════════════════
 # HELPERS
+# ── safe_float/safe_int, haversine_km, travel time, giờ mặc định theo
+#    loại POI, và suy luận thời lượng ghé thăm giờ nằm ở routing/core.py
+#    (dùng chung với webapp/app.py) — xem đó thay vì định nghĩa lại ở đây.
 # ══════════════════════════════════════════════════════════════
 
-def safe_float(val, default=0.0):
-    try:
-        return float(val) if str(val) not in ("", "nan", "None") else default
-    except:
-        return default
-
-def safe_int(val, default=0):
-    try:
-        return int(float(val)) if str(val) not in ("", "nan", "None") else default
-    except:
-        return default
-
-def haversine_km(lat1, lng1, lat2, lng2):
-    R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlng = math.radians(lng2 - lng1)
-    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng/2)**2
-    return R * 2 * math.asin(math.sqrt(a))
+safe_float = rcore.safe_float
+safe_int = rcore.safe_int
+haversine_km = rcore.haversine_km
+infer_visit_duration = rcore.infer_visit_duration
+fmt_min = rcore.fmt_min
+DEFAULT_HOURS_BY_TYPE = rcore.DEFAULT_HOURS_BY_TYPE
+DALAT_LAT = rcore.DALAT_LAT
+DALAT_LNG = rcore.DALAT_LNG
 
 def travel_minutes(lat1, lng1, lat2, lng2):
-    km = haversine_km(lat1, lng1, lat2, lng2)
-    return (km / AVG_SPEED_KMH) * 60
-
-def fmt_min(minutes):
-    if minutes is None:
-        return "?"
-    h = int(minutes) // 60 % 24
-    m = int(minutes) % 60
-    return f"{h:02d}:{m:02d}"
-
-DALAT_LAT = 11.9404
-DALAT_LNG = 108.4583
-
-# ══════════════════════════════════════════════════════════════
-# VISIT DURATION (giữ nguyên)
-# ══════════════════════════════════════════════════════════════
-
-_BASE_DURATION = {
-    "cafe":              55,
-    "nhà hàng":          65,
-    "chợ quán":          40,
-    "địa điểm checkin":  25,
-    "thiên nhiên":       85,
-    "quán ăn":           50,
-    "khác":              40,
-}
-_PRICE_ADJUST = {0: -5, 1: 0, 2: 5, 3: 15, 4: 20}
-
-def infer_visit_duration(poi_type: str, price_level, reviews_count, csv_value) -> int:
-    csv_int = safe_int(csv_value, 0)
-    if csv_int > 0 and csv_int != 45:
-        return csv_int
-    base = _BASE_DURATION.get(poi_type.strip().lower(), 40)
-    pl = safe_int(price_level, 1)
-    base += _PRICE_ADJUST.get(pl, 0)
-    reviews = safe_int(reviews_count, 0)
-    if reviews > 5000:   base += 15
-    elif reviews > 1000: base += 8
-    elif reviews > 500:  base += 3
-    elif reviews < 50:   base -= 5
-    return max(15, base)
+    return rcore.travel_min(lat1, lng1, lat2, lng2, speed_kmh=AVG_SPEED_KMH)
 
 # ══════════════════════════════════════════════════════════════
 # LOAD POI (DEDUP THEO GMAPS_PLACE_ID)
@@ -179,7 +124,7 @@ def load_pois(filepath, top_k, num_days):
             "type":             r.get("type", ""),
             "lat":              lat,
             "lng":              lng,
-            "attraction_score": safe_float(r.get("attraction_score")),
+            "score":            safe_float(r.get("attraction_score")),
             "open_min":         open_min,
             "close_min":        close_min,
             "visit_min":        infer_visit_duration(
@@ -203,7 +148,7 @@ def load_pois(filepath, top_k, num_days):
     # Việc lọc này sẽ được áp dụng khi phân cụm ngày (sau khi đã có clusters)
     # Ở đây ta chỉ lưu lại thông tin rainy_days để dùng sau.
 
-    pois.sort(key=lambda x: x["attraction_score"], reverse=True)
+    pois.sort(key=lambda x: x["score"], reverse=True)
     k = max(top_k, num_days * 5)
 
     anchor_names_lower = [a.lower().strip() for a in ANCHOR_POIS]
@@ -223,56 +168,35 @@ def load_pois(filepath, top_k, num_days):
     return selected, rainy_days
 
 # ══════════════════════════════════════════════════════════════
-# SIMULATE NGÀY (giữ nguyên)
+# SIMULATE NGÀY
+# is_feasible/simulate_day dùng chung với webapp/app.py (routing/core.py).
+# Giữ nguyên chữ ký cũ (không cần truyền user_start/user_end) bằng cách bọc
+# lại quanh hằng số module USER_START/USER_END, để không phải sửa mọi nơi
+# gọi is_feasible(poi, arrive)/simulate_day(poi_list) bên dưới.
 # ══════════════════════════════════════════════════════════════
 
 def is_feasible(poi, arrive_time):
-    start = max(arrive_time, poi["open_min"])
-    end = start + poi["visit_min"]
-    if end > poi["close_min"] or end > USER_END:
-        return False, start, end
-    return True, start, end
+    return rcore.is_feasible(poi, arrive_time, USER_END)
 
 def simulate_day(poi_list):
-    current_time = USER_START
-    current_lat  = poi_list[0]["lat"] if poi_list else DALAT_LAT
-    current_lng  = poi_list[0]["lng"] if poi_list else DALAT_LNG
-    total_km     = 0.0
-    feasible     = 0
-    timeline     = []
-
-    for poi in poi_list:
-        travel_min = travel_minutes(current_lat, current_lng, poi["lat"], poi["lng"])
-        arrive     = current_time + travel_min
-        ok, start, end = is_feasible(poi, arrive)
-
-        km = haversine_km(current_lat, current_lng, poi["lat"], poi["lng"])
-        total_km += km
-
-        timeline.append({
-            "name": poi["name"], "type": poi["type"],
-            "arrive": arrive, "start": start, "end": end,
-            "feasible": ok, "km": km, "rating": poi["rating"],
-            "score": poi["attraction_score"], "address": poi["address"],
-            "video_url": poi["video_url"], "close_min": poi["close_min"],
-        })
-
-        if ok:
-            feasible += 1
-            current_time = end
-        else:
-            current_time = arrive
-        current_lat = poi["lat"]
-        current_lng = poi["lng"]
-
-    return total_km, feasible, timeline
+    # Lưu ý hành vi đặc thù của route_optimizer (khác app.py): mỗi ngày được
+    # đánh giá độc lập, giả định người dùng đã ở sẵn tại POI đầu tiên của
+    # ngày đó (không tính km/thời gian di chuyển tới POI đầu tiên) — vì các
+    # ngày ở đây đến từ cụm K-Means, không có 1 điểm xuất phát cố định như
+    # webapp/app.py. Giữ nguyên hành vi này khi tái sử dụng rcore.simulate_day
+    # bằng cách truyền sẵn start_lat/start_lng = tọa độ POI đầu tiên.
+    start_lat = poi_list[0]["lat"] if poi_list else None
+    start_lng = poi_list[0]["lng"] if poi_list else None
+    # rcore.simulate_day trả về timeline đã sắp theo giờ bắt đầu ghé thăm;
+    # save_route/print_route bên dưới vốn đã tự sort lại theo "start" nên
+    # không ảnh hưởng gì tới hành vi cũ.
+    return rcore.simulate_day(
+        poi_list, USER_START, USER_END, start_lat=start_lat, start_lng=start_lng,
+        distance_fn=haversine_km, duration_fn=travel_minutes,
+    )
 
 def count_infeasible(itinerary):
-    total = 0
-    for day_pois in itinerary:
-        _, feas, _ = simulate_day(day_pois)
-        total += len(day_pois) - feas
-    return total
+    return rcore.count_infeasible(itinerary, USER_START, USER_END)
 
 # ══════════════════════════════════════════════════════════════
 # K-MEANS 3D (lat, lng, open_min) - có lọc outdoor khi mưa
@@ -333,37 +257,7 @@ def initial_itinerary(pois, num_days, rainy_days):
     return itinerary
 
 def greedy_day(poi_list):
-    if not poi_list:
-        return []
-    unvisited = list(poi_list)
-    route = []
-    cur_lat, cur_lng = DALAT_LAT, DALAT_LNG
-    cur_time = USER_START
-
-    while unvisited:
-        best = None
-        best_val = -1
-        for p in unvisited:
-            travel_min = travel_minutes(cur_lat, cur_lng, p["lat"], p["lng"])
-            arrive = cur_time + travel_min
-            ok, _, _ = is_feasible(p, arrive)
-            if not ok:
-                continue
-            dist_km = haversine_km(cur_lat, cur_lng, p["lat"], p["lng"])
-            val = p["attraction_score"] / (dist_km + 0.1)
-            if val > best_val:
-                best_val = val
-                best = p
-        if best is None:
-            best = min(unvisited, key=lambda p: haversine_km(cur_lat, cur_lng, p["lat"], p["lng"]))
-        route.append(best)
-        travel_min = travel_minutes(cur_lat, cur_lng, best["lat"], best["lng"])
-        arrive = cur_time + travel_min
-        _, start, end = is_feasible(best, arrive)
-        cur_time = end if end <= USER_END else arrive
-        cur_lat, cur_lng = best["lat"], best["lng"]
-        unvisited.remove(best)
-    return route
+    return rcore.greedy_day(poi_list, USER_START, USER_END, start_lat=DALAT_LAT, start_lng=DALAT_LNG)
 
 # ══════════════════════════════════════════════════════════════
 # COST FUNCTIONS (giữ nguyên)
