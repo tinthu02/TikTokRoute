@@ -32,7 +32,7 @@ from common import osrm
 from routing import core as rcore  # thuật toán/tiện ích lõi dùng chung với routing/route_optimizer.py
 
 # SQLite database file
-DB_NAME = "user_data.db"
+DB_NAME = "data/app/user_data.db"
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
