@@ -47,12 +47,21 @@ def run_script(script_name):
     logger.info(f"--- Bắt đầu {script_name} ---")
     start = datetime.now()
 
+    child_env = os.environ.copy()
+    child_env["PYTHONUTF8"] = "1"  # ép UTF-8 cho tiến trình con, tránh
+                                    # UnicodeEncodeError khi print() tiếng Việt
+                                    # trên Windows (child mặc định dùng cp1252
+                                    # khi stdout bị pipe, không phải console thật)
+
     process = subprocess.Popen(
         [sys.executable, script_name],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         bufsize=1,
+        env=child_env,
     )
     for line in process.stdout:
         logger.info(f"[{script_name}] {line.rstrip()}")
