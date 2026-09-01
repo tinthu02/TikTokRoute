@@ -2,8 +2,8 @@
 =============================================================
 Seed cache từ kết quả gmaps_join.py đã chạy trước đó
 =============================================================
-Mục đích: bạn đã có `dalat_poi_gmaps_fix.csv` (matched) và
-`dalat_poi_unmatched_fix.csv` (unmatched) từ lần chạy TRƯỚC khi có
+Mục đích: bạn đã có `04_poi_gmaps_matched.csv` (matched) và
+`04_poi_gmaps_unmatched.csv` (unmatched) từ lần chạy TRƯỚC khi có
 cache. Script này "nạp" lại các kết quả đó vào gmaps_cache.db,
 để khi chạy `python gmaps_join.py` lần tới:
 
@@ -25,8 +25,8 @@ Chạy 1 lần trước khi chạy lại gmaps_join.py:
 import csv
 import gmaps_cache as cache
 
-MATCHED_CSV   = "dalat_poi_gmaps_fix.csv"
-UNMATCHED_CSV = "dalat_poi_unmatched_fix.csv"
+MATCHED_CSV   = "04_poi_gmaps_matched.csv"
+UNMATCHED_CSV = "04_poi_gmaps_unmatched.csv"
 
 
 def load_csv(filepath):

@@ -114,9 +114,9 @@ def random_baseline(pois_file, num_days=3, user_start=7*60, user_end=21*60):
 def main():
     random.seed(42)
     files = {
-        'Greedy 3D': 'dalat_route_greedy_3d.csv',
-        'SA Phase1': 'dalat_route_phase1.csv',
-        'SA Phase2': 'dalat_route_3days.csv'
+        'Greedy 3D': '06_route_greedy_init.csv',
+        'SA Phase1': '06_route_phase1_feasible.csv',
+        'SA Phase2': '06_route_final_3days.csv'
     }
     results = {}
     for name, f in files.items():
@@ -125,15 +125,15 @@ def main():
             results[name] = metrics
             print(f"{name:12} | km={metrics['total_km']:.1f} | feasible_rate={metrics['feasible_rate']:.1%} | balance_std={metrics['balance_std']:.1f}")
     
-    random_metrics = random_baseline('dalat_poi_scored_fix.csv', num_days=3)
+    random_metrics = random_baseline('05_poi_scored.csv', num_days=3)
     if random_metrics:
         results['Random'] = random_metrics
         print(f"{'Random':12} | km={random_metrics['total_km']:.1f} | feasible_rate={random_metrics['feasible_rate']:.1%} | balance_std={random_metrics['balance_std']:.1f}")
     
     df_comp = pd.DataFrame(results).T[['total_km', 'feasible_rate', 'balance_std']]
     os.makedirs("evaluation_output", exist_ok=True)
-    df_comp.to_csv("evaluation_output/metrics_summary.csv", encoding="utf-8-sig")
-    print("\nĐã lưu bảng metrics: evaluation_output/metrics_summary.csv")
+    df_comp.to_csv("evaluation_output/06_metrics_summary.csv", encoding="utf-8-sig")
+    print("\nĐã lưu bảng metrics: evaluation_output/06_metrics_summary.csv")
     
     # Vẽ biểu đồ
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))

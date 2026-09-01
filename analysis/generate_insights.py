@@ -32,10 +32,10 @@ sns.set_style("darkgrid")
 os.makedirs("eda_output", exist_ok=True)
 
 # Đọc dữ liệu
-poi_clean = pd.read_csv("dalat_poi_clean_final.csv", encoding="utf-8-sig")
+poi_clean = pd.read_csv("03_poi_clean.csv", encoding="utf-8-sig")
 poi_clean['type'] = poi_clean['type'].str.strip().str.split('|').str[0]
 
-videos_raw = pd.read_csv("dalat_videos_raw_fix.csv", encoding="utf-8-sig")
+videos_raw = pd.read_csv("01_videos_raw.csv", encoding="utf-8-sig")
 # Chuẩn hóa cột text
 for col in ['description', 'voice_to_text', 'in_video_text']:
     if col in videos_raw.columns:

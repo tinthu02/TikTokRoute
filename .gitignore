@@ -7,16 +7,16 @@ user_preferences.db
 gmaps_cache.db
 
 # Chặn các file kết quả xuất ra dạng bảng (CSV) tránh làm rác lịch sử commit
-dalat_poi_gmaps_fix.csv
-dalat_poi_scored_fix.csv
-dalat_poi_unmatched_fix.csv
-dalat_poi_sentiment.csv
-dalat_route_3days.csv
-dalat_route_greedy_3d.csv
-dalat_route_phase1.csv
+04_poi_gmaps_matched.csv
+05_poi_scored.csv
+04_poi_gmaps_unmatched.csv
+04_poi_sentiment.csv
+06_route_final_*days.csv
+06_route_greedy_init.csv
+06_route_phase1_feasible.csv
 
 # Chặn bản đồ HTML kết quả xuất ra từ Folium/Geopandas
-dalat_route_map.html
+06_route_final_map.html
 
 # ==============================================================================
 # PYTHON STANDARD & ENVIRONMENTS (Cấu hình chuẩn Python & Môi trường ảo)

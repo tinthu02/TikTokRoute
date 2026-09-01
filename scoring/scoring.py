@@ -10,7 +10,7 @@ Cải tiến:
   
 Gộp POI trùng lặp theo gmaps_place_id, 
 cộng dồn mention/digg/plays, chỉ nối video_urls khi có token chung với tên chuẩn, 
-thêm ablation test 3 cấu hình trọng số, INPUT_CSV = 'dalat_poi_gmaps_fix.csv'
+thêm ablation test 3 cấu hình trọng số, INPUT_CSV = '04_poi_gmaps_matched.csv'
 =============================================================
 """
 
@@ -21,8 +21,8 @@ from collections import defaultdict
 # CẤU HÌNH
 # ══════════════════════════════════════════════════════════════
 
-INPUT_CSV  = "dalat_poi_gmaps_fix.csv"   # thay vì "dalat_poi_gmaps.csv"
-OUTPUT_CSV = "dalat_poi_scored_fix.csv"  # nên đặt tên riêng
+INPUT_CSV  = "04_poi_gmaps_matched.csv"
+OUTPUT_CSV = "05_poi_scored.csv"
 
 W_TIKTOK = 0.6   # tín hiệu viral TikTok
 W_GMAPS  = 0.4   # chất lượng Google Maps

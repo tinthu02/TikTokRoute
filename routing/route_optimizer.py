@@ -24,7 +24,7 @@ import argparse
 # CẤU HÌNH
 # ══════════════════════════════════════════════════════════════
 
-INPUT_CSV   = "dalat_poi_scored_fix.csv"
+INPUT_CSV   = "05_poi_scored.csv"
 NUM_DAYS    = 3
 TOP_K       = 40
 ANCHOR_POIS: list[str] = []
@@ -506,18 +506,18 @@ def main():
 
     print("\nBước 2: Khởi tạo K-Means 3D + Greedy (có lọc outdoor khi mưa)...")
     init_itin = initial_itinerary(pois, NUM_DAYS, rainy_days)
-    save_route(init_itin, "dalat_route_greedy_3d.csv", "Greedy 3D")
+    save_route(init_itin, "06_route_greedy_init.csv", "Greedy 3D")
     print_route(init_itin, "Greedy (K-Means 3D)")
 
     print("\nBước 3: SA Phase 1 (feasibility)...")
     feas_itin, _ = sa_phase1(init_itin)
     target = count_infeasible(feas_itin)
     print(f"  Phase 1 done: infeasible = {target}")
-    save_route(feas_itin, "dalat_route_phase1.csv", "SA_Phase1")
+    save_route(feas_itin, "06_route_phase1_feasible.csv", "SA_Phase1")
 
     print("\nBước 4: SA Phase 2 (km, hard constraint)...")
     final_itin, _ = sa_phase2(feas_itin, target)
-    km_final, feas_final, stops_final = save_route(final_itin, f"dalat_route_{NUM_DAYS}days.csv", "SA_Phase2")
+    km_final, feas_final, stops_final = save_route(final_itin, f"06_route_final_{NUM_DAYS}days.csv", "SA_Phase2")
     print_route(final_itin, "SA 2-phase")
 
     km_greedy, feas_greedy, _ = save_route(init_itin, "temp.csv", "temp")
@@ -539,7 +539,7 @@ def main():
         greedy_rate = round(100 * feas_greedy / greedy_total_stops)
     print(f"  {'Feasibility rate':<30} {greedy_rate:>11}% {round(100*feas_final/stops_final):>11}%")
     print(f"\n  Thời gian: {time.time()-t_start:.1f}s")
-    print(f"  Output: dalat_route_{NUM_DAYS}days.csv")
+    print(f"  Output: 06_route_final_{NUM_DAYS}days.csv")
     print("="*60)
 
 if __name__ == "__main__":
