@@ -2,9 +2,9 @@
 =============================================================
 GIAI ĐOẠN 3 — Join POI với Google Maps
 =============================================================
-Input:  dalat_poi_clean.csv        (output của giai đoạn 2)
-Output: dalat_poi_gmaps.csv        (đã có tọa độ, rating, giờ mở cửa)
-        dalat_poi_unmatched.csv    (POI không match được)
+Input:  03_poi_clean.csv               (output của giai đoạn 2)
+Output: 04_poi_gmaps_matched.csv       (đã có tọa độ, rating, giờ mở cửa)
+        04_poi_gmaps_unmatched.csv     (POI không match được)
 
 Yêu cầu:
   pip install requests python-dotenv rapidfuzz
@@ -36,9 +36,12 @@ if not GMAPS_API_KEY:
 # CẤU HÌNH
 # ══════════════════════════════════════════════════════════════
 
-INPUT_CSV = "dalat_poi_clean_fix.csv"      # thay vì "dalat_poi_clean.csv"
-OUTPUT_MATCHED = "dalat_poi_gmaps_fix.csv" # nên đặt tên khác để tránh ghi đè
-OUTPUT_UNMATCHED = "dalat_poi_unmatched_fix.csv"
+INPUT_CSV = "03_poi_clean.csv"                # BUGFIX: trước đây trỏ vào "dalat_poi_clean_fix.csv",
+                                               # một file KHÔNG do script nào tạo ra — clean_poi.py
+                                               # thực ra ghi ra "dalat_poi_clean_final.csv" (505 dòng,
+                                               # khác 18 dòng so với "_fix.csv" cũ). Đã trỏ đúng output thật.
+OUTPUT_MATCHED = "04_poi_gmaps_matched.csv"
+OUTPUT_UNMATCHED = "04_poi_gmaps_unmatched.csv"
 
 # Bounding box Đà Lạt — lọc kết quả ngoài vùng
 DALAT_LAT = 11.9404

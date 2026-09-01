@@ -37,19 +37,19 @@ print("ĐANG ĐỌC DỮ LIỆU...")
 print("="*60)
 
 # POI clean (sau khi gộp tên)
-poi_clean = pd.read_csv("dalat_poi_clean_final.csv", encoding="utf-8-sig")
+poi_clean = pd.read_csv("03_poi_clean.csv", encoding="utf-8-sig")
 # Chuẩn hóa type: bỏ khoảng trắng, lấy phần đầu trước '|'
 poi_clean['type'] = poi_clean['type'].str.strip().str.split('|').str[0]
-print(f"Đọc {len(poi_clean)} POI từ dalat_poi_clean_final.csv")
+print(f"Đọc {len(poi_clean)} POI từ 03_poi_clean.csv")
 
 # POI scored (có điểm attraction, Google rating)
-poi_scored = pd.read_csv("dalat_poi_scored_fix.csv", encoding="utf-8-sig")
+poi_scored = pd.read_csv("05_poi_scored.csv", encoding="utf-8-sig")
 poi_scored['type'] = poi_scored['type'].str.strip().str.split('|').str[0]
-print(f"Đọc {len(poi_scored)} POI từ dalat_poi_scored_fix.csv")
+print(f"Đọc {len(poi_scored)} POI từ 05_poi_scored.csv")
 
 # Video raw (có mention_count, digg, play, timestamp...)
-videos_raw = pd.read_csv("dalat_videos_raw_fix.csv", encoding="utf-8-sig")
-print(f"Đọc {len(videos_raw)} video từ dalat_videos_raw_fix.csv")
+videos_raw = pd.read_csv("01_videos_raw.csv", encoding="utf-8-sig")
+print(f"Đọc {len(videos_raw)} video từ 01_videos_raw.csv")
 
 # =============================================================
 # 2. PHÂN PHỐI LOẠI POI

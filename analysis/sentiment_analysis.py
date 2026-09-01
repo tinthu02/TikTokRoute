@@ -2,9 +2,9 @@
 sentiment_analysis.py
 ─────────────────────
 Pipeline:
-  dalat_poi_gmaps_fix.csv
+  04_poi_gmaps_matched.csv
       └─► phân tích sentiment từng POI (video_caption) qua Ollama qwen2.5:7b
-          └─► dalat_poi_sentiment.csv  (thêm cột: sentiment_score, sentiment_label, sentiment_raw)
+          └─► 04_poi_sentiment.csv  (thêm cột: sentiment_score, sentiment_label, sentiment_raw)
 
 Chèn TRƯỚC scoring.py trong pipeline tổng.
 """
@@ -23,8 +23,8 @@ import sentiment_cache as cache
 # ──────────────────────────────────────────────
 # CẤU HÌNH
 # ──────────────────────────────────────────────
-INPUT_FILE   = "dalat_poi_gmaps_fix.csv"
-OUTPUT_FILE  = "dalat_poi_sentiment.csv"
+INPUT_FILE   = "04_poi_gmaps_matched.csv"
+OUTPUT_FILE  = "04_poi_sentiment.csv"
 
 OLLAMA_URL   = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "qwen2.5:7b"

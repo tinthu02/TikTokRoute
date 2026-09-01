@@ -32,12 +32,12 @@ logging.basicConfig(
 logger = logging.getLogger("full_pipeline")
 
 SCRIPTS = [
-    ("scraping/dalat_scraper_fix.py", "dalat_poi_extracted_fix.csv"),
-    ("processing/clean_poi.py", "dalat_poi_clean_final.csv"),
-    ("processing/gmaps_join.py", "dalat_poi_gmaps_fix.csv"),
-    ("scoring/scoring.py", "dalat_poi_scored_fix.csv"),
-    ("routing/route_optimizer.py", "dalat_route_3days.csv"),
-    ("analysis/visualize_route.py", "dalat_route_map.html")
+    ("scraping/dalat_scraper_fix.py", "02_poi_extracted.csv"),
+    ("processing/clean_poi.py", "03_poi_clean.csv"),
+    ("processing/gmaps_join.py", "04_poi_gmaps_matched.csv"),
+    ("scoring/scoring.py", "05_poi_scored.csv"),
+    ("routing/route_optimizer.py", "06_route_final_3days.csv"),
+    ("analysis/visualize_route.py", "06_route_final_map.html")
 ]
 
 def run_script(script_name):
@@ -47,12 +47,21 @@ def run_script(script_name):
     logger.info(f"--- Bắt đầu {script_name} ---")
     start = datetime.now()
 
+    child_env = os.environ.copy()
+    child_env["PYTHONUTF8"] = "1"  # ép UTF-8 cho tiến trình con, tránh
+                                    # UnicodeEncodeError khi print() tiếng Việt
+                                    # trên Windows (child mặc định dùng cp1252
+                                    # khi stdout bị pipe, không phải console thật)
+
     process = subprocess.Popen(
         [sys.executable, script_name],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         bufsize=1,
+        env=child_env,
     )
     for line in process.stdout:
         logger.info(f"[{script_name}] {line.rstrip()}")

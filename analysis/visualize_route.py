@@ -2,8 +2,8 @@
 =============================================================
 GIAI ĐOẠN 6 — Trực quan hóa lộ trình trên bản đồ (cải tiến)
 =============================================================
-Input:  dalat_route_3days.csv  (output của giai đoạn 5)
-Output: dalat_route_map.html   (bản đồ tương tác có panel thông tin)
+Input:  06_route_final_3days.csv  (output của giai đoạn 5)
+Output: 06_route_final_map.html   (bản đồ tương tác có panel thông tin)
 
 Yêu cầu: pip install folium requests
 
@@ -11,7 +11,7 @@ Thêm panel thông tin tổng quan (km, thời gian di chuyển,
 số điểm feasible), đặt legend chính giữa phía dưới, 
 chỉ hiển thị km (tắt dặm), cải thiện marker (hình tròn màu theo ngày), 
 dùng AntPath cho hiệu ứng đường chạy, thêm MiniMap, MeasureControl, 
-join tọa độ từ dalat_poi_scored_fix.csv
+join tọa độ từ 05_poi_scored.csv
 =============================================================
 """
 
@@ -26,8 +26,8 @@ from folium.plugins import AntPath
 # CẤU HÌNH
 # ══════════════════════════════════════════════════════════════
 
-INPUT_CSV  = "dalat_route_3days.csv"
-OUTPUT_MAP = "dalat_route_map.html"
+INPUT_CSV  = "06_route_final_3days.csv"
+OUTPUT_MAP = "06_route_final_map.html"
 
 # Màu sắc đẹp cho từng ngày
 DAY_COLORS = {
@@ -270,7 +270,7 @@ def build_map(days, day_stats):
 # ══════════════════════════════════════════════════════════════
 
 def join_coords():
-    scored_path = "dalat_poi_scored_fix.csv"
+    scored_path = "05_poi_scored.csv"
     if not os.path.exists(scored_path):
         print(f"  Không tìm thấy {scored_path}!")
         return

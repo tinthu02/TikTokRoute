@@ -2,8 +2,8 @@
 =============================================================
 GIAI ĐOẠN 2 — Clean & Dedup POI Đà Lạt (Hoàn chỉnh)
 =============================================================
-Input:  dalat_poi_extracted_fix.csv  (output của giai đoạn 1)
-Output: dalat_poi_clean_final.csv    (đã lọc, gộp tên, viết hoa)
+Input:  02_poi_extracted.csv  (output của giai đoạn 1)
+Output: 03_poi_clean.csv      (đã lọc, gộp tên, viết hoa)
 
 Yêu cầu: pip install requests
 Ollama phải đang chạy với model qwen2.5:7b
@@ -21,8 +21,8 @@ from collections import defaultdict
 # CẤU HÌNH
 # ══════════════════════════════════════════════════════════════
 
-INPUT_CSV  = "dalat_poi_extracted_fix.csv"
-OUTPUT_CSV = "dalat_poi_clean_final.csv"
+INPUT_CSV  = "02_poi_extracted.csv"
+OUTPUT_CSV = "03_poi_clean.csv"
 
 OLLAMA_MODEL   = "qwen2.5:7b"
 OLLAMA_URL     = "http://localhost:11434/api/chat"

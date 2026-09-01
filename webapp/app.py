@@ -102,7 +102,7 @@ init_db()
 # CONFIG
 # ══════════════════════════════════════════════════════════════
 
-POI_CSV = "dalat_poi_scored_fix.csv"
+POI_CSV = "05_poi_scored.csv"
 DALAT_CENTER  = [11.9404, 108.4583]
 AVG_SPEED_KMH = 30
 

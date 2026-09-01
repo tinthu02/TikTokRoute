@@ -20,7 +20,7 @@ import seaborn as sns
 import os
 
 # Đọc dữ liệu POI đã có Google rating
-df = pd.read_csv("dalat_poi_scored_fix.csv", encoding="utf-8-sig")
+df = pd.read_csv("05_poi_scored.csv", encoding="utf-8-sig")
 # Lọc các dòng có rating > 0
 df = df[df['gmaps_rating'] > 0].copy()
 print(f"Số POI có rating: {len(df)}")
@@ -97,8 +97,8 @@ print("\nĐã lưu biểu đồ so sánh: eda_output/scoring_comparison.png")
 weights_dict = {f: w for f, w in zip(features, weights)}
 weights_dict['intercept'] = intercept
 weights_df = pd.DataFrame([weights_dict])
-weights_df.to_csv("optimized_weights.csv", index=False)
-print("\nĐã lưu trọng số tối ưu vào optimized_weights.csv")
+weights_df.to_csv("05_optimized_weights.csv", index=False)
+print("\nĐã lưu trọng số tối ưu vào 05_optimized_weights.csv")
 
 # In gợi ý công thức mới
 print("\n=== Công thức scoring được đề xuất ===")

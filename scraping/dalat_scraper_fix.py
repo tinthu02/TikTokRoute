@@ -89,8 +89,8 @@ MAX_VIDEOS_PER_HASHTAG = 30
 # Free plan RAM 8GB → 2 worker song song
 MAX_WORKERS = 2
 
-RAW_CSV  = "dalat_videos_raw_fix.csv"
-POI_CSV  = "dalat_poi_extracted_fix.csv"
+RAW_CSV  = "01_videos_raw.csv"
+POI_CSV  = "02_poi_extracted.csv"
 ACTOR_ID = "clockworks/tiktok-scraper"
 
 # Ollama config

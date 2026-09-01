@@ -14,7 +14,7 @@ from sklearn.metrics import r2_score
 import matplotlib.pyplot as plt
 
 # Đọc dữ liệu
-df = pd.read_csv("dalat_poi_scored_fix.csv", encoding="utf-8-sig")
+df = pd.read_csv("05_poi_scored.csv", encoding="utf-8-sig")
 df = df.dropna(subset=['gmaps_rating', 'gmaps_reviews_count']).copy()
 print(f"Tổng số POI: {len(df)}")
 
