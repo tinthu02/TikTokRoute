@@ -5,6 +5,7 @@
 user_data.db
 user_preferences.db
 gmaps_cache.db
+sentiment_cache.db
 
 # Chặn các file kết quả xuất ra dạng bảng (CSV) tránh làm rác lịch sử commit
 04_poi_gmaps_matched.csv
