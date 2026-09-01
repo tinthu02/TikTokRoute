@@ -23,7 +23,7 @@ import hashlib
 from datetime import datetime
 from contextlib import contextmanager
 
-CACHE_DB = "gmaps_cache.db"
+CACHE_DB = "data/cache/gmaps_cache.db"
 
 
 @contextmanager

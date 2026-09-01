@@ -21,7 +21,7 @@ import hashlib
 from datetime import datetime
 from contextlib import contextmanager
 
-CACHE_DB = "sentiment_cache.db"
+CACHE_DB = "data/cache/sentiment_cache.db"
 
 
 @contextmanager
