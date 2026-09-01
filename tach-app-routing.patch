@@ -1,0 +1,2884 @@
+diff --git a/routing/__init__.py b/routing/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/routing/core.py b/routing/core.py
+new file mode 100644
+index 0000000..010d908
+--- /dev/null
++++ b/routing/core.py
+@@ -0,0 +1,198 @@
++"""
++=============================================================
++routing.core — thuật toán & tiện ích lộ trình DÙNG CHUNG
++=============================================================
++Trước đây webapp/app.py và routing/route_optimizer.py mỗi nơi tự định
++nghĩa một bản y hệt (hoặc gần y hệt) của: safe_float/safe_int,
++haversine_km, infer_visit_duration, is_feasible, vòng lặp simulate_day,
++vòng lặp greedy chọn POI tiếp theo... Mỗi lần sửa 1 chỗ (vd. công thức
++haversine, cách suy luận giờ mở cửa mặc định) lại phải nhớ sửa cả 2 nơi
++— rất dễ bị "trôi" logic (2 nơi tính ra kết quả khác nhau) như đã xảy ra
++trong lịch sử repo. Module này gom phần LÕI dùng chung vào 1 chỗ.
++
++Những gì KHÔNG gom vào đây (cố tình để riêng ở mỗi nơi):
++- Vòng lặp Simulated Annealing của app.py (1 pha, cost = km + phạt
++  infeasible, chia ngày bằng cách cắt lát list) và của route_optimizer.py
++  (2 pha, cost có thêm balance/meal-bonus/type-diversity, chia ngày bằng
++  K-Means 3D) là 2 công thức tối ưu THỰC SỰ khác nhau, không phải trùng
++  lặp code — gộp cưỡng ép sẽ tạo ra 1 abstraction rò rỉ, khó hiểu hơn là
++  giữ 2 bản riêng. Cả hai đều tái sử dụng is_feasible/simulate_day ở đây
++  làm hàm đánh giá (evaluation) chung, đó là phần quan trọng cần dùng chung.
++- Cách load & lọc dedup POI từ CSV (khác nhau: app.py dedup theo tọa độ,
++  route_optimizer.py dedup theo gmaps_place_id trước, tọa độ sau).
++
++Quy ước dict `poi` dùng chung: bắt buộc có "lat", "lng", "open_min",
++"close_min", "visit_min", "score" (điểm hấp dẫn, trước đây route_optimizer
++gọi là "attraction_score" — đã đổi tên cho khớp với app.py).
++"""
++
++import math
++
++# ── Hằng số dùng chung ──────────────────────────────────────────
++DALAT_LAT = 11.9404
++DALAT_LNG = 108.4583
++AVG_SPEED_KMH = 30
++
++DEFAULT_HOURS_BY_TYPE = {
++    "thiên nhiên":      (7 * 60, 18 * 60),
++    "địa điểm checkin": (6 * 60, 20 * 60),
++    "cafe":             (7 * 60, 22 * 60),
++    "nhà hàng":         (10 * 60, 22 * 60),
++    "chợ quán":         (6 * 60, 22 * 60),
++    "khác":             (7 * 60, 21 * 60),
++}
++
++BASE_DURATION = {
++    "cafe": 55, "nhà hàng": 65, "chợ quán": 40, "địa điểm checkin": 25,
++    "thiên nhiên": 85, "quán ăn": 50, "khác": 40,
++}
++PRICE_ADJUST = {0: -5, 1: 0, 2: 5, 3: 15, 4: 20}
++
++
++# ── Ép kiểu an toàn ─────────────────────────────────────────────
++def safe_float(v, default=0.0):
++    try:
++        return float(v) if str(v) not in ("", "nan", "None") else default
++    except (TypeError, ValueError):
++        return default
++
++
++def safe_int(v, default=0):
++    try:
++        return int(float(v)) if str(v) not in ("", "nan", "None") else default
++    except (TypeError, ValueError):
++        return default
++
++
++# ── Khoảng cách & thời gian di chuyển ───────────────────────────
++def haversine_km(lat1, lng1, lat2, lng2):
++    R = 6371.0
++    dlat = math.radians(lat2 - lat1)
++    dlng = math.radians(lng2 - lng1)
++    a = (math.sin(dlat / 2) ** 2
++         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2)
++    return R * 2 * math.asin(math.sqrt(a))
++
++
++def travel_min(lat1, lng1, lat2, lng2, speed_kmh=AVG_SPEED_KMH):
++    return haversine_km(lat1, lng1, lat2, lng2) / speed_kmh * 60
++
++
++def fmt_min(minutes):
++    if minutes is None:
++        return "?"
++    h = int(minutes) // 60 % 24
++    m = int(minutes) % 60
++    return f"{h:02d}:{m:02d}"
++
++
++# ── Suy luận thời lượng ghé thăm ────────────────────────────────
++def infer_visit_duration(poi_type, price_level, reviews_count, csv_value):
++    csv_int = safe_int(csv_value, 0)
++    if csv_int > 0 and csv_int != 45:
++        return csv_int
++    base = BASE_DURATION.get(str(poi_type).strip().lower(), 40)
++    base += PRICE_ADJUST.get(safe_int(price_level, 1), 0)
++    reviews = safe_int(reviews_count, 0)
++    if reviews > 5000:
++        base += 15
++    elif reviews > 1000:
++        base += 8
++    elif reviews > 500:
++        base += 3
++    elif reviews < 50:
++        base -= 5
++    return max(15, base)
++
++
++# ── Khả thi & mô phỏng 1 ngày ───────────────────────────────────
++def is_feasible(poi, arrive, user_end):
++    """1 POI có ghé thăm được không nếu tới lúc `arrive` (phút)."""
++    start = max(arrive, poi["open_min"])
++    end = start + poi["visit_min"]
++    return (end <= poi["close_min"] and end <= user_end), start, end
++
++
++def default_score_fn(poi, dist_km):
++    """Hàm chấm điểm mặc định cho bước chọn greedy: điểm hấp dẫn / khoảng cách."""
++    return poi["score"] / (dist_km + 0.1)
++
++
++def simulate_day(poi_list, user_start, user_end, start_lat=None, start_lng=None,
++                  distance_fn=haversine_km, duration_fn=travel_min):
++    """
++    Mô phỏng việc di chuyển tuần tự qua `poi_list` bắt đầu từ (start_lat,
++    start_lng) lúc `user_start`. Trả về (total_km, số điểm khả thi, timeline
++    đã sắp theo giờ bắt đầu ghé thăm).
++
++    `distance_fn`/`duration_fn` cho phép cắm khoảng cách/thời gian "chính
++    xác" (vd. qua OSRM) thay vì đường chim bay mặc định — webapp/app.py
++    dùng việc này cho chế độ `accurate=True`.
++    """
++    cur_time = user_start
++    cur_lat = start_lat if start_lat else DALAT_LAT
++    cur_lng = start_lng if start_lng else DALAT_LNG
++    total_km = 0.0
++    feasible = 0
++    timeline = []
++    for poi in poi_list:
++        tm = duration_fn(cur_lat, cur_lng, poi["lat"], poi["lng"])
++        arrive = cur_time + tm
++        ok, start, end = is_feasible(poi, arrive, user_end)
++        km = distance_fn(cur_lat, cur_lng, poi["lat"], poi["lng"])
++        total_km += km
++        timeline.append({**poi, "arrive": arrive, "start": start, "end": end,
++                          "feasible": ok, "km": round(km, 2)})
++        cur_time = end if ok else arrive
++        cur_lat, cur_lng = poi["lat"], poi["lng"]
++        if ok:
++            feasible += 1
++    return total_km, feasible, sorted(timeline, key=lambda x: x["start"])
++
++
++def count_infeasible(itinerary, user_start, user_end):
++    """itinerary: list các ngày, mỗi ngày là list POI."""
++    total = 0
++    for day_pois in itinerary:
++        _, feas, _ = simulate_day(day_pois, user_start, user_end)
++        total += len(day_pois) - feas
++    return total
++
++
++# ── Greedy: chọn POI kế tiếp tốt nhất ───────────────────────────
++def greedy_day(poi_list, user_start, user_end, start_lat=None, start_lng=None,
++               score_fn=default_score_fn):
++    """
++    Thuật toán nearest-best-value dùng chung cho cả 2 nơi: ở mỗi bước, chọn
++    POI khả thi có `score_fn(poi, dist_km)` cao nhất; nếu không còn POI nào
++    khả thi, chọn POI gần nhất (để không bỏ sót, dù sẽ bị đánh dấu
++    infeasible). `score_fn` cho phép app.py cộng thêm trọng số cá nhân hóa
++    theo user, còn route_optimizer.py dùng mặc định.
++    """
++    if not poi_list:
++        return []
++    unvisited = list(poi_list)
++    route = []
++    cur_lat = start_lat if start_lat else DALAT_LAT
++    cur_lng = start_lng if start_lng else DALAT_LNG
++    cur_time = user_start
++    while unvisited:
++        best, best_val = None, -1
++        for p in unvisited:
++            tm = travel_min(cur_lat, cur_lng, p["lat"], p["lng"])
++            ok, _, _ = is_feasible(p, cur_time + tm, user_end)
++            if not ok:
++                continue
++            dist = haversine_km(cur_lat, cur_lng, p["lat"], p["lng"])
++            val = score_fn(p, dist)
++            if val > best_val:
++                best_val, best = val, p
++        if best is None:
++            best = min(unvisited, key=lambda p: haversine_km(cur_lat, cur_lng, p["lat"], p["lng"]))
++        route.append(best)
++        tm = travel_min(cur_lat, cur_lng, best["lat"], best["lng"])
++        _, _, end = is_feasible(best, cur_time + tm, user_end)
++        cur_time = end if end <= user_end else cur_time + tm
++        cur_lat, cur_lng = best["lat"], best["lng"]
++        unvisited.remove(best)
++    return route
+diff --git a/routing/route_optimizer.py b/routing/route_optimizer.py
+index 227e92a..be682ac 100644
+--- a/routing/route_optimizer.py
++++ b/routing/route_optimizer.py
+@@ -12,11 +12,12 @@ GIAI ĐOẠN 5 — Tối ưu lộ trình du lịch Đà Lạt (có tích hợp t
+ import csv, math, random, time, copy, os, sys
+ import numpy as np
+ 
+-# Cho phép import package `common/` ở thư mục gốc repo, bất kể script này
+-# được chạy bằng `python routing/route_optimizer.py` từ đâu, hay bị
+-# full_pipeline.py gọi bằng subprocess.
++# Cho phép import package `common/` và `routing/` ở thư mục gốc repo, bất kể
++# script này được chạy bằng `python routing/route_optimizer.py` từ đâu, hay
++# bị full_pipeline.py gọi bằng subprocess.
+ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ from common.weather import get_rainy_days  # thêm dòng này
++from routing import core as rcore  # thuật toán/tiện ích lõi dùng chung với webapp/app.py
+ import argparse
+ 
+ # ══════════════════════════════════════════════════════════════
+@@ -50,80 +51,24 @@ FOOD_TYPES = {"chợ quán", "nhà hàng", "quán ăn", "ăn_uống"}
+ # Các loại POI ngoài trời (sẽ bị loại nếu trời mưa)
+ OUTDOOR_TYPES = {"thiên nhiên", "địa điểm checkin"}  # check-in thường ngoài trời
+ 
+-DEFAULT_HOURS_BY_TYPE = {
+-    "thiên nhiên":      (7*60,  18*60),
+-    "địa điểm checkin": (6*60,  20*60),
+-    "cafe":             (7*60,  22*60),
+-    "nhà hàng":         (10*60, 22*60),
+-    "chợ quán":         (6*60,  22*60),
+-    "khác":             (7*60,  21*60),
+-}
+-
+ # ══════════════════════════════════════════════════════════════
+ # HELPERS
++# ── safe_float/safe_int, haversine_km, travel time, giờ mặc định theo
++#    loại POI, và suy luận thời lượng ghé thăm giờ nằm ở routing/core.py
++#    (dùng chung với webapp/app.py) — xem đó thay vì định nghĩa lại ở đây.
+ # ══════════════════════════════════════════════════════════════
+ 
+-def safe_float(val, default=0.0):
+-    try:
+-        return float(val) if str(val) not in ("", "nan", "None") else default
+-    except:
+-        return default
+-
+-def safe_int(val, default=0):
+-    try:
+-        return int(float(val)) if str(val) not in ("", "nan", "None") else default
+-    except:
+-        return default
+-
+-def haversine_km(lat1, lng1, lat2, lng2):
+-    R = 6371.0
+-    dlat = math.radians(lat2 - lat1)
+-    dlng = math.radians(lng2 - lng1)
+-    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng/2)**2
+-    return R * 2 * math.asin(math.sqrt(a))
++safe_float = rcore.safe_float
++safe_int = rcore.safe_int
++haversine_km = rcore.haversine_km
++infer_visit_duration = rcore.infer_visit_duration
++fmt_min = rcore.fmt_min
++DEFAULT_HOURS_BY_TYPE = rcore.DEFAULT_HOURS_BY_TYPE
++DALAT_LAT = rcore.DALAT_LAT
++DALAT_LNG = rcore.DALAT_LNG
+ 
+ def travel_minutes(lat1, lng1, lat2, lng2):
+-    km = haversine_km(lat1, lng1, lat2, lng2)
+-    return (km / AVG_SPEED_KMH) * 60
+-
+-def fmt_min(minutes):
+-    if minutes is None:
+-        return "?"
+-    h = int(minutes) // 60 % 24
+-    m = int(minutes) % 60
+-    return f"{h:02d}:{m:02d}"
+-
+-DALAT_LAT = 11.9404
+-DALAT_LNG = 108.4583
+-
+-# ══════════════════════════════════════════════════════════════
+-# VISIT DURATION (giữ nguyên)
+-# ══════════════════════════════════════════════════════════════
+-
+-_BASE_DURATION = {
+-    "cafe":              55,
+-    "nhà hàng":          65,
+-    "chợ quán":          40,
+-    "địa điểm checkin":  25,
+-    "thiên nhiên":       85,
+-    "quán ăn":           50,
+-    "khác":              40,
+-}
+-_PRICE_ADJUST = {0: -5, 1: 0, 2: 5, 3: 15, 4: 20}
+-
+-def infer_visit_duration(poi_type: str, price_level, reviews_count, csv_value) -> int:
+-    csv_int = safe_int(csv_value, 0)
+-    if csv_int > 0 and csv_int != 45:
+-        return csv_int
+-    base = _BASE_DURATION.get(poi_type.strip().lower(), 40)
+-    pl = safe_int(price_level, 1)
+-    base += _PRICE_ADJUST.get(pl, 0)
+-    reviews = safe_int(reviews_count, 0)
+-    if reviews > 5000:   base += 15
+-    elif reviews > 1000: base += 8
+-    elif reviews > 500:  base += 3
+-    elif reviews < 50:   base -= 5
+-    return max(15, base)
++    return rcore.travel_min(lat1, lng1, lat2, lng2, speed_kmh=AVG_SPEED_KMH)
+ 
+ # ══════════════════════════════════════════════════════════════
+ # LOAD POI (DEDUP THEO GMAPS_PLACE_ID)
+@@ -179,7 +124,7 @@ def load_pois(filepath, top_k, num_days):
+             "type":             r.get("type", ""),
+             "lat":              lat,
+             "lng":              lng,
+-            "attraction_score": safe_float(r.get("attraction_score")),
++            "score":            safe_float(r.get("attraction_score")),
+             "open_min":         open_min,
+             "close_min":        close_min,
+             "visit_min":        infer_visit_duration(
+@@ -203,7 +148,7 @@ def load_pois(filepath, top_k, num_days):
+     # Việc lọc này sẽ được áp dụng khi phân cụm ngày (sau khi đã có clusters)
+     # Ở đây ta chỉ lưu lại thông tin rainy_days để dùng sau.
+ 
+-    pois.sort(key=lambda x: x["attraction_score"], reverse=True)
++    pois.sort(key=lambda x: x["score"], reverse=True)
+     k = max(top_k, num_days * 5)
+ 
+     anchor_names_lower = [a.lower().strip() for a in ANCHOR_POIS]
+@@ -223,56 +168,35 @@ def load_pois(filepath, top_k, num_days):
+     return selected, rainy_days
+ 
+ # ══════════════════════════════════════════════════════════════
+-# SIMULATE NGÀY (giữ nguyên)
++# SIMULATE NGÀY
++# is_feasible/simulate_day dùng chung với webapp/app.py (routing/core.py).
++# Giữ nguyên chữ ký cũ (không cần truyền user_start/user_end) bằng cách bọc
++# lại quanh hằng số module USER_START/USER_END, để không phải sửa mọi nơi
++# gọi is_feasible(poi, arrive)/simulate_day(poi_list) bên dưới.
+ # ══════════════════════════════════════════════════════════════
+ 
+ def is_feasible(poi, arrive_time):
+-    start = max(arrive_time, poi["open_min"])
+-    end = start + poi["visit_min"]
+-    if end > poi["close_min"] or end > USER_END:
+-        return False, start, end
+-    return True, start, end
++    return rcore.is_feasible(poi, arrive_time, USER_END)
+ 
+ def simulate_day(poi_list):
+-    current_time = USER_START
+-    current_lat  = poi_list[0]["lat"] if poi_list else DALAT_LAT
+-    current_lng  = poi_list[0]["lng"] if poi_list else DALAT_LNG
+-    total_km     = 0.0
+-    feasible     = 0
+-    timeline     = []
+-
+-    for poi in poi_list:
+-        travel_min = travel_minutes(current_lat, current_lng, poi["lat"], poi["lng"])
+-        arrive     = current_time + travel_min
+-        ok, start, end = is_feasible(poi, arrive)
+-
+-        km = haversine_km(current_lat, current_lng, poi["lat"], poi["lng"])
+-        total_km += km
+-
+-        timeline.append({
+-            "name": poi["name"], "type": poi["type"],
+-            "arrive": arrive, "start": start, "end": end,
+-            "feasible": ok, "km": km, "rating": poi["rating"],
+-            "score": poi["attraction_score"], "address": poi["address"],
+-            "video_url": poi["video_url"], "close_min": poi["close_min"],
+-        })
+-
+-        if ok:
+-            feasible += 1
+-            current_time = end
+-        else:
+-            current_time = arrive
+-        current_lat = poi["lat"]
+-        current_lng = poi["lng"]
+-
+-    return total_km, feasible, timeline
++    # Lưu ý hành vi đặc thù của route_optimizer (khác app.py): mỗi ngày được
++    # đánh giá độc lập, giả định người dùng đã ở sẵn tại POI đầu tiên của
++    # ngày đó (không tính km/thời gian di chuyển tới POI đầu tiên) — vì các
++    # ngày ở đây đến từ cụm K-Means, không có 1 điểm xuất phát cố định như
++    # webapp/app.py. Giữ nguyên hành vi này khi tái sử dụng rcore.simulate_day
++    # bằng cách truyền sẵn start_lat/start_lng = tọa độ POI đầu tiên.
++    start_lat = poi_list[0]["lat"] if poi_list else None
++    start_lng = poi_list[0]["lng"] if poi_list else None
++    # rcore.simulate_day trả về timeline đã sắp theo giờ bắt đầu ghé thăm;
++    # save_route/print_route bên dưới vốn đã tự sort lại theo "start" nên
++    # không ảnh hưởng gì tới hành vi cũ.
++    return rcore.simulate_day(
++        poi_list, USER_START, USER_END, start_lat=start_lat, start_lng=start_lng,
++        distance_fn=haversine_km, duration_fn=travel_minutes,
++    )
+ 
+ def count_infeasible(itinerary):
+-    total = 0
+-    for day_pois in itinerary:
+-        _, feas, _ = simulate_day(day_pois)
+-        total += len(day_pois) - feas
+-    return total
++    return rcore.count_infeasible(itinerary, USER_START, USER_END)
+ 
+ # ══════════════════════════════════════════════════════════════
+ # K-MEANS 3D (lat, lng, open_min) - có lọc outdoor khi mưa
+@@ -333,37 +257,7 @@ def initial_itinerary(pois, num_days, rainy_days):
+     return itinerary
+ 
+ def greedy_day(poi_list):
+-    if not poi_list:
+-        return []
+-    unvisited = list(poi_list)
+-    route = []
+-    cur_lat, cur_lng = DALAT_LAT, DALAT_LNG
+-    cur_time = USER_START
+-
+-    while unvisited:
+-        best = None
+-        best_val = -1
+-        for p in unvisited:
+-            travel_min = travel_minutes(cur_lat, cur_lng, p["lat"], p["lng"])
+-            arrive = cur_time + travel_min
+-            ok, _, _ = is_feasible(p, arrive)
+-            if not ok:
+-                continue
+-            dist_km = haversine_km(cur_lat, cur_lng, p["lat"], p["lng"])
+-            val = p["attraction_score"] / (dist_km + 0.1)
+-            if val > best_val:
+-                best_val = val
+-                best = p
+-        if best is None:
+-            best = min(unvisited, key=lambda p: haversine_km(cur_lat, cur_lng, p["lat"], p["lng"]))
+-        route.append(best)
+-        travel_min = travel_minutes(cur_lat, cur_lng, best["lat"], best["lng"])
+-        arrive = cur_time + travel_min
+-        _, start, end = is_feasible(best, arrive)
+-        cur_time = end if end <= USER_END else arrive
+-        cur_lat, cur_lng = best["lat"], best["lng"]
+-        unvisited.remove(best)
+-    return route
++    return rcore.greedy_day(poi_list, USER_START, USER_END, start_lat=DALAT_LAT, start_lng=DALAT_LNG)
+ 
+ # ══════════════════════════════════════════════════════════════
+ # COST FUNCTIONS (giữ nguyên)
+diff --git a/webapp/app.py b/webapp/app.py
+index 5b1b275..f20d002 100644
+--- a/webapp/app.py
++++ b/webapp/app.py
+@@ -17,18 +17,19 @@ feat: tích hợp form đánh giá hành trình (feedback) và thông báo popup
+ - Thêm hiệu ứng hover và chọn sao trong feedback"
+ """
+ 
+-from flask import Flask, render_template_string, request, jsonify, make_response
++from flask import Flask, render_template, request, jsonify, make_response
+ import csv, math, random, json, os, sqlite3, sys
+ from uuid import uuid4
+ 
+ import requests
+ 
+-# Cho phép import package `common/` ở thư mục gốc repo, bất kể app.py được
+-# chạy bằng `python webapp/app.py` từ đâu (CWD nào) hay bị full_pipeline.py
+-# gọi bằng subprocess.
++# Cho phép import package `common/` và `routing/` ở thư mục gốc repo, bất kể
++# app.py được chạy bằng `python webapp/app.py` từ đâu (CWD nào) hay bị
++# full_pipeline.py gọi bằng subprocess.
+ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ from common.weather import get_rainy_days
+ from common import osrm
++from routing import core as rcore  # thuật toán/tiện ích lõi dùng chung với routing/route_optimizer.py
+ 
+ # SQLite database file
+ DB_NAME = "user_data.db"
+@@ -121,30 +122,27 @@ OUTDOOR_TYPES = {"thiên nhiên", "địa điểm checkin"}
+ 
+ # ══════════════════════════════════════════════════════════════
+ # HELPERS
++# safe_float/safe_int, haversine_km, travel_min, infer_visit_duration và
++# giờ mặc định theo loại POI giờ nằm ở routing/core.py (dùng chung với
++# routing/route_optimizer.py) — chỉ còn lại phần đặc thù của webapp ở đây
++# (đường chim bay "nhanh" cho lúc build lộ trình vs. OSRM "chính xác" cho
++# lúc hiển thị kết quả cuối, video URL, tên hàm fmt/_DEFAULT_HOURS cũ).
+ # ══════════════════════════════════════════════════════════════
+ 
+-def safe_float(v, d=0.0):
+-    try: return float(v) if str(v) not in ("","nan","None") else d
+-    except: return d
+-
+-def safe_int(v, d=0):
+-    try: return int(float(v)) if str(v) not in ("","nan","None") else d
+-    except: return d
++safe_float = rcore.safe_float
++safe_int = rcore.safe_int
++haversine_km = rcore.haversine_km
++infer_visit_duration = rcore.infer_visit_duration
++_DEFAULT_HOURS = rcore.DEFAULT_HOURS_BY_TYPE
+ 
+ def filter_relevant_video_url(place_name, video_urls_str):
+     if not video_urls_str: return ""
+     urls = [u.strip() for u in video_urls_str.split("|") if u.strip()]
+     return urls[0] if urls else ""
+ 
+-def haversine_km(lat1, lng1, lat2, lng2):
+-    R = 6371.0
+-    dlat = math.radians(lat2-lat1); dlng = math.radians(lng2-lng1)
+-    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1))*math.cos(math.radians(lat2))*math.sin(dlng/2)**2
+-    return R*2*math.asin(math.sqrt(a))
+-
+ def travel_min(lat1, lng1, lat2, lng2):
+-    return haversine_km(lat1,lng1,lat2,lng2)/AVG_SPEED_KMH*60
+-  
++    return rcore.travel_min(lat1, lng1, lat2, lng2, speed_kmh=AVG_SPEED_KMH)
++
+ # Hàm mới — chỉ gọi sau khi SA xong
+ def travel_min_accurate(lat1, lng1, lat2, lng2):
+     return osrm.travel_min(lat1, lng1, lat2, lng2)
+@@ -152,31 +150,7 @@ def travel_min_accurate(lat1, lng1, lat2, lng2):
+ def distance_km_accurate(lat1, lng1, lat2, lng2):
+     return osrm.distance_km(lat1, lng1, lat2, lng2)
+ 
+-def fmt(minutes):
+-    if minutes is None: return "?"
+-    h=int(minutes)//60%24; m=int(minutes)%60
+-    return f"{h:02d}:{m:02d}"
+-
+-_BASE_DURATION = {"cafe":55, "nhà hàng":65, "chợ quán":40, "địa điểm checkin":25, "thiên nhiên":85, "quán ăn":50, "khác":40}
+-_PRICE_ADJUST = {0:-5,1:0,2:5,3:15,4:20}
+-
+-def infer_visit_duration(poi_type, price_level, reviews_count, csv_value):
+-    csv_int = safe_int(csv_value, 0)
+-    if csv_int > 0 and csv_int != 45: return csv_int
+-    base = _BASE_DURATION.get(poi_type.strip().lower(), 40)
+-    base += _PRICE_ADJUST.get(safe_int(price_level,1),0)
+-    reviews = safe_int(reviews_count,0)
+-    if reviews > 5000: base+=15
+-    elif reviews > 1000: base+=8
+-    elif reviews > 500: base+=3
+-    elif reviews < 50: base-=5
+-    return max(15, base)
+-
+-_DEFAULT_HOURS = {
+-    "thiên nhiên": (7*60,18*60), "địa điểm checkin": (6*60,20*60),
+-    "cafe": (7*60,22*60), "nhà hàng": (10*60,22*60),
+-    "chợ quán": (6*60,22*60), "khác": (7*60,21*60),
+-}
++fmt = rcore.fmt_min
+ 
+ # ══════════════════════════════════════════════════════════════
+ # LOAD POI
+@@ -222,34 +196,20 @@ def load_pois():
+     return pois
+ 
+ # ══════════════════════════════════════════════════════════════
+-# OPTIMIZER (giữ nguyên)
++# OPTIMIZER
++# is_feasible/simulate_day dùng chung với routing/route_optimizer.py qua
++# routing/core.py. Ở đây chỉ còn phần đặc thù webapp: chọn khoảng cách/thời
++# gian "nhanh" (đường chim bay) hay "chính xác" (OSRM) tuỳ cờ `accurate`.
+ # ══════════════════════════════════════════════════════════════
+ 
+ def is_feasible(poi, arrive, user_end):
+-    start = max(arrive, poi["open_min"])
+-    end = start + poi["visit_min"]
+-    return (end <= poi["close_min"] and end <= user_end), start, end
++    return rcore.is_feasible(poi, arrive, user_end)
+ 
+ def simulate_day(poi_list, user_start, user_end, start_lat=None, start_lng=None, accurate=False):
+-    cur_time = user_start
+-    cur_lat = start_lat if start_lat else DALAT_CENTER[0]
+-    cur_lng = start_lng if start_lng else DALAT_CENTER[1]
+-    total_km = 0.0
+-    feasible = 0
+-    timeline = []
+-    for poi in poi_list:
+-        tm = travel_min_accurate(cur_lat, cur_lng, poi["lat"], poi["lng"]) if accurate \
+-             else travel_min(cur_lat, cur_lng, poi["lat"], poi["lng"])
+-        arrive = cur_time + tm
+-        ok, start, end = is_feasible(poi, arrive, user_end)
+-        km = distance_km_accurate(cur_lat, cur_lng, poi["lat"], poi["lng"]) if accurate \
+-             else haversine_km(cur_lat, cur_lng, poi["lat"], poi["lng"])
+-        total_km += km
+-        timeline.append({**poi, "arrive":arrive, "start":start, "end":end, "feasible":ok, "km":round(km,2)})
+-        cur_time = end if ok else arrive
+-        cur_lat, cur_lng = poi["lat"], poi["lng"]
+-        if ok: feasible += 1
+-    return total_km, feasible, sorted(timeline, key=lambda x: x["start"])
++    distance_fn, duration_fn = (distance_km_accurate, travel_min_accurate) if accurate \
++        else (haversine_km, travel_min)
++    return rcore.simulate_day(poi_list, user_start, user_end, start_lat, start_lng,
++                               distance_fn=distance_fn, duration_fn=duration_fn)
+ 
+ def split_days(route, num_days):
+     sorted_route = route
+@@ -476,29 +436,14 @@ def save_route_meta(route_id, num_days, total_km, total_stops, poi_names, user_t
+     conn.commit()
+     conn.close()
+ 
++# greedy: nearest-best-value dùng chung với routing/route_optimizer.py
++# (routing.core.greedy_day) — phần đặc thù ở đây chỉ là score_fn có cộng
++# thêm trọng số cá nhân hoá theo user_token.
+ def greedy(pois, user_start, user_end, start_lat=None, start_lng=None, user_token=None):
+-    unvisited = list(pois); route = []
+-    cur_lat = start_lat if start_lat else DALAT_CENTER[0]
+-    cur_lng = start_lng if start_lng else DALAT_CENTER[1]
+-    cur_time = user_start
+-    while unvisited:
+-        best=None; best_val=-1
+-        for p in unvisited:
+-            tm=travel_min(cur_lat,cur_lng,p["lat"],p["lng"])
+-            ok,start,end=is_feasible(p, cur_time+tm, user_end)
+-            if not ok: continue
+-            dist=haversine_km(cur_lat,cur_lng,p["lat"],p["lng"])
+-            weight = get_user_weight(user_token, p["type"]) if user_token else 1.0
+-            val = (p["score"] * weight) / (dist + 0.1)
+-            if val>best_val: best_val=val; best=p
+-        if best is None:
+-            best=min(unvisited, key=lambda p: haversine_km(cur_lat,cur_lng,p["lat"],p["lng"]))
+-        route.append(best)
+-        tm=travel_min(cur_lat,cur_lng,best["lat"],best["lng"])
+-        _,_,end=is_feasible(best, cur_time+tm, user_end)
+-        cur_time=end; cur_lat,cur_lng=best["lat"],best["lng"]
+-        unvisited.remove(best)
+-    return route
++    def score_fn(p, dist_km):
++        weight = get_user_weight(user_token, p["type"]) if user_token else 1.0
++        return (p["score"] * weight) / (dist_km + 0.1)
++    return rcore.greedy_day(pois, user_start, user_end, start_lat, start_lng, score_fn=score_fn)
+ 
+ def simulated_annealing(initial, num_days, user_start, user_end, T0=800, alpha=0.995, max_iter=30000, anchor_names=None, start_lat=11.9404, start_lng=108.4583):
+     anchor_names = anchor_names or []
+@@ -549,10 +494,10 @@ def index():
+     user_token = request.cookies.get("user_token")
+     if not user_token:
+         user_token = str(uuid4())
+-        resp = make_response(render_template_string(HTML_TEMPLATE, user_token=user_token))
++        resp = make_response(render_template("index.html", user_token=user_token))
+         resp.set_cookie("user_token", user_token, max_age=60*60*24*365, httponly=True, samesite='Lax')
+         return resp
+-    return render_template_string(HTML_TEMPLATE, user_token=user_token)
++    return render_template("index.html", user_token=user_token)
+ 
+ @app.route("/api/optimize", methods=["POST"])
+ def optimize():
+@@ -771,1107 +716,6 @@ def submit_feedback():
+ 
+     return jsonify({"success": True, "message": "Cảm ơn bạn đã đánh giá hành trình!"})
+ 
+-# ══════════════════════════════════════════════════════════════
+-# HTML TEMPLATE (đã sửa CSS popup và sao)
+-# ══════════════════════════════════════════════════════════════
+-
+-HTML_TEMPLATE = """<!DOCTYPE html>
+-<html lang="vi">
+-<head>
+-<meta charset="UTF-8">
+-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+-<title>Đà Lạt Route Planner</title>
+-<link rel="preconnect" href="https://fonts.googleapis.com">
+-<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+-<style>
+-:root {
+-  --bg: #0a0c12;
+-  --surface: #141822;
+-  --surface-light: #1e2432;
+-  --border: #2a2f3f;
+-  --accent: #d4b87a;
+-  --accent-dark: #b89a5c;
+-  --accent-glow: rgba(212,184,122,0.2);
+-  --text: #f0f2f5;
+-  --text-muted: #9ca3af;
+-}
+-* { margin:0; padding:0; box-sizing:border-box; }
+-body {
+-  font-family: 'Inter', sans-serif;
+-  background: var(--bg);
+-  color: var(--text);
+-  height: 100vh;
+-  display: flex;
+-  overflow: hidden;
+-}
+-::-webkit-scrollbar { width: 6px; }
+-::-webkit-scrollbar-track { background: transparent; }
+-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+-#sidebar {
+-  width: 420px;
+-  min-width: 360px;
+-  background: var(--surface);
+-  border-right: 1px solid var(--border);
+-  display: flex;
+-  flex-direction: column;
+-  overflow: hidden;
+-  height: 100vh;
+-  overflow-y: auto;
+-  overflow-x: hidden;
+-  z-index: 10;
+-}
+-.sidebar-header {
+-  display: flex;
+-  justify-content: space-between;
+-  align-items: center;
+-  padding: 16px 20px;
+-  border-bottom: 1px solid var(--border);
+-  background: linear-gradient(135deg, #0a0c12 0%, #141822 100%);
+-}
+-.sidebar-header h1 {
+-  font-family: 'Playfair Display', serif;
+-  font-size: 22px;
+-  background: linear-gradient(135deg, var(--accent), #f5e6c4);
+-  -webkit-background-clip: text;
+-  background-clip: text;
+-  color: transparent;
+-}
+-#form-section {
+-  background: rgba(20,24,34,0.6);
+-  border-bottom: 1px solid var(--border);
+-  transition: max-height 0.4s ease, padding 0.3s;
+-  overflow-y: auto;
+-  padding: 0 20px;
+-  max-height: 600px;
+-}
+-#form-section.collapsed {
+-  max-height: 0 !important;
+-  padding: 0 20px !important;
+-  border-bottom: none;
+-}
+-#form-inner {
+-  padding: 20px 0;
+-}
+-.form-row-compact {
+-  display: flex;
+-  gap: 12px;
+-  margin-bottom: 16px;
+-}
+-.form-group {
+-  flex: 1;
+-}
+-.form-group label {
+-  display: block;
+-  font-size: 10px;
+-  font-weight: 600;
+-  color: var(--text-muted);
+-  text-transform: uppercase;
+-  letter-spacing: 0.5px;
+-  margin-bottom: 4px;
+-}
+-.form-group input, .form-group select {
+-  width: 100%;
+-  background: var(--bg);
+-  border: 1px solid var(--border);
+-  border-radius: 10px;
+-  color: var(--text);
+-  padding: 8px 10px;
+-  font-size: 13px;
+-  font-family: 'Inter', sans-serif;
+-}
+-#type-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+-.type-pill {
+-  background: var(--bg);
+-  border: 1px solid var(--border);
+-  border-radius: 30px;
+-  padding: 4px 10px;
+-  font-size: 11px;
+-  cursor: pointer;
+-}
+-.type-pill.active { background: var(--accent); border-color: var(--accent); color: #0a0c12; }
+-.preference-group {
+-  display: grid;
+-  grid-template-columns: 1fr 1fr;
+-  gap: 8px;
+-  margin: 8px 0 12px;
+-}
+-.preference-group label {
+-  display: flex;
+-  align-items: center;
+-  gap: 6px;
+-  font-size: 11px;
+-  background: var(--bg);
+-  border: 1px solid var(--border);
+-  border-radius: 8px;
+-  padding: 6px 8px;
+-  cursor: pointer;
+-}
+-#anchor-section {
+-  margin: 8px 0 12px;
+-}
+-#anchor-input {
+-  background: var(--bg);
+-  border: 1px solid var(--border);
+-  border-radius: 10px;
+-  color: var(--text);
+-  padding: 8px 10px 8px 32px;
+-  font-size: 13px;
+-  font-family: 'Inter', sans-serif;
+-  width: 100%;
+-  outline: none;
+-  transition: border-color 0.2s;
+-  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%23d4b87a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>');
+-  background-repeat: no-repeat;
+-  background-position: 10px center;
+-}
+-#anchor-input:focus {
+-  border-color: var(--accent);
+-  box-shadow: 0 0 0 2px var(--accent-glow);
+-}
+-#anchor-drop {
+-  background: var(--surface);
+-  border: 1px solid var(--accent);
+-  border-radius: 12px;
+-  box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+-  overflow: hidden;
+-}
+-.anchor-drop-item {
+-  padding: 10px 14px;
+-  font-size: 13px;
+-  cursor: pointer;
+-  display: flex;
+-  gap: 12px;
+-  align-items: center;
+-  transition: background 0.15s;
+-  border-bottom: 1px solid var(--border);
+-}
+-.anchor-drop-item:last-child { border-bottom: none; }
+-.anchor-drop-item:hover { background: var(--surface-light); }
+-.anchor-tag {
+-  display: inline-flex;
+-  align-items: center;
+-  gap: 6px;
+-  background: rgba(212,184,122,0.15);
+-  border: 1px solid var(--accent);
+-  border-radius: 40px;
+-  padding: 4px 10px 4px 12px;
+-  font-size: 12px;
+-  color: var(--accent);
+-}
+-.anchor-tag button {
+-  background: none;
+-  border: none;
+-  color: var(--accent);
+-  font-size: 16px;
+-  cursor: pointer;
+-  margin-left: 4px;
+-  line-height: 1;
+-}
+-.anchor-tag button:hover {
+-  color: #ff5e5e;
+-}
+-#start-location-section {
+-  margin-bottom: 8px;
+-  padding: 8px 10px;
+-  background: var(--bg);
+-  border: 1px solid var(--border);
+-  border-radius: 8px;
+-}
+-#start-location-section .sl-row {
+-  display: flex; gap: 8px; align-items: center; margin-top: 6px;
+-}
+-#start-location-section .sl-badge {
+-  display: flex; align-items: center; gap: 6px;
+-  font-size: 11px; color: var(--accent);
+-  background: rgba(212,184,122,0.1); border: 1px solid var(--accent);
+-  border-radius: 6px; padding: 3px 8px; flex: 1;
+-}
+-#start-location-section .sl-btn {
+-  background: var(--surface-light); border: 1px solid var(--border);
+-  color: var(--text-muted); border-radius: 6px; padding: 4px 8px;
+-  font-size: 11px; cursor: pointer; white-space: nowrap;
+-}
+-#start-location-section .sl-btn:hover { border-color: var(--accent); color: var(--accent); }
+-#btn-optimize {
+-  width: 100%;
+-  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+-  color: #0a0c12;
+-  border: none;
+-  border-radius: 12px;
+-  padding: 10px;
+-  font-size: 14px;
+-  font-weight: 700;
+-  cursor: pointer;
+-  margin-top: 12px;
+-}
+-#summary-bar {
+-  display: none;
+-  padding: 12px 20px;
+-  background: rgba(212,184,122,0.08);
+-  border-bottom: 1px solid var(--border);
+-  justify-content: space-around;
+-  text-align: center;
+-}
+-.summary-item {
+-  flex: 1;
+-}
+-.summary-item .label {
+-  font-size: 11px;
+-  color: var(--text-muted);
+-  text-transform: uppercase;
+-}
+-.summary-item .value {
+-  font-size: 22px;
+-  font-weight: 700;
+-  color: var(--accent);
+-  line-height: 1.2;
+-}
+-.summary-item .unit {
+-  font-size: 12px;
+-  color: var(--text-muted);
+-}
+-#weather-banner {
+-  padding: 8px 16px;
+-  background: rgba(96,165,250,0.1);
+-  border-bottom: 1px solid rgba(96,165,250,0.3);
+-  font-size: 11px;
+-  color: #93c5fd;
+-  display: none;
+-}
+-#timeline {
+-  flex: 1;
+-  overflow-y: auto;
+-  padding: 0;
+-}
+-.day-section { border-bottom: 1px solid var(--border); }
+-.day-header {
+-  display: flex;
+-  align-items: center;
+-  gap: 12px;
+-  padding: 12px 20px;
+-  background: var(--surface-light);
+-  cursor: pointer;
+-}
+-.day-dot { width: 10px; height: 10px; border-radius: 50%; }
+-.day-header h3 { font-size: 14px; font-weight: 600; flex: 1; }
+-.day-stats { font-size: 10px; color: var(--text-muted); display: flex; gap: 12px; }
+-.stop-item {
+-  display: flex;
+-  gap: 12px;
+-  padding: 8px 20px 8px 36px;
+-  cursor: pointer;
+-  border-left: 3px solid transparent;
+-  transition: 0.25s;
+-  border: 1px solid rgba(255,255,255,0.05);
+-}
+-.stop-item:hover {
+-  transform: translateX(8px);
+-  background: rgba(255,255,255,0.05);
+-  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+-}
+-.stop-num {
+-  width: 24px; height: 24px;
+-  border-radius: 50%;
+-  display: flex;
+-  align-items: center;
+-  justify-content: center;
+-  font-size: 10px;
+-  font-weight: 700;
+-  color: white;
+-}
+-.stop-body { flex: 1; min-width: 0; }
+-.stop-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+-.stop-meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 10px; }
+-/* Popup marker - không viền trắng dày, bóng mờ nhẹ */
+-.map-popup {
+-  background: rgba(20,20,25,0.95);
+-  color: white;
+-  border-radius: 12px;
+-  padding: 6px 10px;
+-  backdrop-filter: blur(6px);
+-  border: none;
+-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+-  font-size: 12px;
+-  line-height: 1.4;
+-}
+-.map-popup b {
+-  font-size: 14px;
+-  color: #f0d79a;
+-}
+-.map-popup .meta {
+-  opacity: 0.8;
+-  margin: 2px 0;
+-  font-size: 11px;
+-}
+-.map-popup .rating-stars {
+-  display: inline-block;
+-  font-size: 12px;
+-  letter-spacing: 2px;
+-  color: #ffcc00;
+-}
+-.stop-time { color: var(--accent); font-weight: 500; }
+-.badge-infeasible { background: rgba(255,94,94,0.15); color: #ff5e5e; padding: 2px 8px; border-radius: 20px; font-size: 10px; }
+-.badge-anchor { background: rgba(212,184,122,0.15); color: var(--accent); padding: 2px 8px; border-radius: 20px; font-size: 10px; }
+-#map-container { flex: 1; position: relative; }
+-#map { width: 100%; height: 100%; }
+-#loading {
+-  display: none;
+-  position: absolute;
+-  inset: 0;
+-  background: rgba(10,12,18,0.9);
+-  backdrop-filter: blur(4px);
+-  z-index: 1000;
+-  align-items: center;
+-  justify-content: center;
+-  flex-direction: column;
+-  gap: 16px;
+-}
+-#loading.show { display: flex; }
+-.spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+-@keyframes spin { to { transform: rotate(360deg); } }
+-/* Feedback container — floating card góc dưới phải (trên bản đồ) */
+-#feedback-container {
+-  display: none;
+-  position: fixed;
+-  bottom: 24px;
+-  right: 24px;
+-  width: 290px;
+-  z-index: 9998;
+-  animation: feedbackSlideUp 0.35s cubic-bezier(0.34,1.56,0.64,1);
+-}
+-@keyframes feedbackSlideUp {
+-  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+-  to   { opacity: 1; transform: translateY(0) scale(1); }
+-}
+-.feedback-box {
+-  background: var(--surface-light);
+-  border: 1px solid var(--border);
+-  border-radius: 14px;
+-  overflow: hidden;
+-  box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+-  position: relative;
+-}
+-#feedback-drag-handle {
+-  display: flex;
+-  align-items: center;
+-  justify-content: space-between;
+-  padding: 10px 12px 8px;
+-  background: rgba(212,184,122,0.08);
+-  border-bottom: 1px solid var(--border);
+-  cursor: grab;
+-  user-select: none;
+-  font-size: 13px;
+-  font-weight: 600;
+-}
+-#feedback-drag-handle:active { cursor: grabbing; }
+-.feedback-drag-dots {
+-  font-size: 11px;
+-  letter-spacing: 1px;
+-  color: var(--text-muted);
+-  margin-right: 6px;
+-  pointer-events: none;
+-}
+-.feedback-body { padding: 10px 14px 12px; }
+-.feedback-dismiss {
+-  background: none;
+-  border: none;
+-  color: var(--text-muted);
+-  font-size: 15px;
+-  cursor: pointer;
+-  line-height: 1;
+-  padding: 2px 4px;
+-  border-radius: 4px;
+-  transition: color 0.15s;
+-  flex-shrink: 0;
+-}
+-.feedback-dismiss:hover { color: var(--text); }
+-.stars {
+-  display: flex;
+-  gap: 4px;
+-  margin: 6px 0;
+-}
+-.star {
+-  cursor: pointer;
+-  font-size: 22px;
+-  transition: 0.1s;
+-  display: inline-block;
+-}
+-.star.selected {
+-  color: #ffcc00;
+-  filter: drop-shadow(0 0 2px gold);
+-}
+-.star:hover {
+-  transform: scale(1.1);
+-}
+-.popup {
+-  display: none;
+-  position: fixed;
+-  z-index: 999;
+-  left: 0;
+-  top: 0;
+-  width: 100%;
+-  height: 100%;
+-  background: rgba(0,0,0,0.5);
+-  justify-content: center;
+-  align-items: center;
+-}
+-.popup-content {
+-  background: white;
+-  padding: 30px;
+-  border-radius: 20px;
+-  text-align: center;
+-  width: 320px;
+-  animation: popupShow 0.3s ease;
+-  color: #222;
+-}
+-.popup-content h2 { color: #ff4d6d; font-size: 32px; margin-bottom: 10px; }
+-.popup-content p { color: #444; font-size: 18px; line-height: 1.5; }
+-.popup-content button { margin-top: 15px; background: #ff4d6d; color: white; border: none; padding: 10px 18px; border-radius: 10px; cursor: pointer; }
+-@keyframes popupShow { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+-
+-/* ── Toast thông báo trọng số ── */
+-#weight-toast {
+-  position: fixed;
+-  bottom: 24px;
+-  right: 24px;
+-  background: var(--surface-light);
+-  border: 1px solid var(--accent);
+-  border-radius: 12px;
+-  padding: 12px 16px;
+-  min-width: 260px;
+-  max-width: 340px;
+-  z-index: 9999;
+-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+-  transform: translateY(20px);
+-  opacity: 0;
+-  transition: opacity 0.3s, transform 0.3s;
+-  pointer-events: none;
+-}
+-#weight-toast.show {
+-  opacity: 1;
+-  transform: translateY(0);
+-  pointer-events: auto;
+-}
+-#weight-toast .toast-title {
+-  font-size: 12px;
+-  font-weight: 600;
+-  color: var(--accent);
+-  margin-bottom: 8px;
+-}
+-.weight-row {
+-  display: flex;
+-  align-items: center;
+-  gap: 8px;
+-  font-size: 11px;
+-  margin: 4px 0;
+-  color: var(--text);
+-}
+-.weight-bar-bg {
+-  flex: 1;
+-  height: 5px;
+-  background: var(--border);
+-  border-radius: 3px;
+-  overflow: hidden;
+-}
+-.weight-bar-fill {
+-  height: 100%;
+-  background: var(--accent);
+-  border-radius: 3px;
+-  transition: width 0.4s ease;
+-}
+-.weight-val {
+-  font-size: 11px;
+-  color: var(--text-muted);
+-  width: 34px;
+-  text-align: right;
+-}
+-.weight-arrow { font-size: 12px; width: 14px; }
+-
+-/* ── Panel trọng số trong sidebar ── */
+-#weights-panel {
+-  padding: 12px 20px;
+-  border-bottom: 1px solid var(--border);
+-  display: none;
+-}
+-#weights-panel .wp-header {
+-  display: flex;
+-  justify-content: space-between;
+-  align-items: center;
+-  margin-bottom: 8px;
+-}
+-#weights-panel .wp-title {
+-  font-size: 11px;
+-  font-weight: 600;
+-  color: var(--text-muted);
+-  text-transform: uppercase;
+-  letter-spacing: 0.5px;
+-}
+-#weights-panel .wp-reset {
+-  font-size: 11px;
+-  color: var(--accent);
+-  background: none;
+-  border: 1px solid var(--accent);
+-  border-radius: 20px;
+-  padding: 2px 10px;
+-  cursor: pointer;
+-  transition: 0.2s;
+-}
+-#weights-panel .wp-reset:hover {
+-  background: var(--accent);
+-  color: #0a0c12;
+-}
+-</style>
+-</head>
+-<body>
+-
+-<div id="sidebar">
+-  <div class="sidebar-header">
+-    <h1>🏔 Đà Lạt Planner</h1>
+-  </div>
+-  <div id="form-section" style="max-height: 500px;">
+-    <div id="form-inner">
+-      <div class="form-row-compact">
+-        <div class="form-group"><label>Số ngày</label><input type="number" id="num_days" value="3" min="1" max="5"></div>
+-        <div class="form-group"><label>Số POI</label><input type="number" id="top_k" value="40" min="10" max="80"></div>
+-        <div class="form-group"><label>Bắt đầu</label><select id="start_hour"><option value="6">06:00</option><option value="7" selected>07:00</option><option value="8">08:00</option><option value="9">09:00</option></select></div>
+-        <div class="form-group"><label>Kết thúc</label><select id="end_hour"><option value="19">19:00</option><option value="20">20:00</option><option value="21" selected>21:00</option><option value="22">22:00</option></select></div>
+-      </div>
+-      <label>🧭 Sở thích du lịch</label>
+-      <div class="preference-group">
+-        <label><input type="checkbox" id="pref_adventure"> 🏔 Mạo hiểm</label>
+-        <label><input type="checkbox" id="pref_relax"> 🌿 Thư giãn</label>
+-        <label><input type="checkbox" id="pref_food"> 🍜 Ăn uống</label>
+-        <label><input type="checkbox" id="pref_checkin"> 📸 Check-in</label>
+-      </div>
+-      <label>Loại địa điểm</label>
+-      <div id="type-filters"><div class="type-pill active" data-type="all">✨ Tất cả</div></div>
+-      <label>📌 Điểm bắt buộc</label>
+-      <div id="anchor-section">
+-        <div style="position:relative;"><input type="text" id="anchor-input" placeholder="Tìm địa điểm..." autocomplete="off"><div id="anchor-drop"></div></div>
+-        <div id="anchor-tags" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;"></div>
+-      </div>
+-      <div id="start-location-section">
+-        <label>📍 Điểm xuất phát</label>
+-        <div class="sl-row">
+-          <div class="sl-badge" id="sl-badge">🏔 Mặc định: Trung tâm Đà Lạt</div>
+-          <button class="sl-btn" onclick="detectLocation()">📡 Vị trí của tôi</button>
+-          <button class="sl-btn" onclick="pickOnMap()">🗺 Chọn trên bản đồ</button>
+-          <button class="sl-btn" id="sl-clear" onclick="clearStartLocation()" style="display:none;">✕</button>
+-        </div>
+-      </div>
+-      <button id="btn-optimize" onclick="optimize()">🗺 Tối ưu lộ trình</button>
+-    </div>
+-  </div>
+-
+-  <div id="summary-bar" style="display:none;">
+-    <div class="summary-item"><div class="label">Tổng km</div><div class="value" id="s-km">-</div><div class="unit">km</div></div>
+-    <div class="summary-item"><div class="label">Đúng giờ</div><div class="value" id="s-rate">-</div><div class="unit">%</div></div>
+-    <div class="summary-item"><div class="label">Địa điểm</div><div class="value" id="s-stops">-</div><div class="unit">/ -</div></div>
+-    <button id="btn-reopen-form" onclick="toggleForm()" style="display:none;align-self:center;background:rgba(212,184,122,0.15);border:1px solid var(--accent);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--accent);cursor:pointer;white-space:nowrap;">⚙ Cài đặt</button>
+-  </div>
+-
+-  <div id="weather-banner"></div>
+-  <div id="timeline">
+-    <div style="padding:40px 20px; text-align:center; color:var(--text-muted);">⬅️ Nhập thông tin và bấm tạo lộ trình</div>
+-  </div>
+-
+-  <!-- Panel trọng số cá nhân — nằm dưới timeline -->
+-  <div id="weights-panel">
+-    <div class="wp-header">
+-      <span class="wp-title">🧠 Trọng số sở thích của bạn</span>
+-      <button class="wp-reset" onclick="resetWeights()">↺ Reset</button>
+-    </div>
+-    <div class="weight-row"><span>☕ Cà phê</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-cafe" style="width:50%"></div></div><span class="weight-val" id="wv-cafe">1.00</span></div>
+-    <div class="weight-row"><span>🌿 Thiên nhiên</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-nature" style="width:50%"></div></div><span class="weight-val" id="wv-nature">1.00</span></div>
+-    <div class="weight-row"><span>🍜 Ăn uống</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-food" style="width:50%"></div></div><span class="weight-val" id="wv-food">1.00</span></div>
+-    <div class="weight-row"><span>📸 Check-in</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-checkin" style="width:50%"></div></div><span class="weight-val" id="wv-checkin">1.00</span></div>
+-  </div>
+-
+-</div>
+-
+-<!-- Feedback floating card (ngoài sidebar, fixed góc trái dưới) -->
+-<div id="feedback-container">
+-  <div class="feedback-box">
+-    <div id="feedback-drag-handle">
+-      <span>⭐ Đánh giá hành trình</span>
+-      <button class="feedback-dismiss" onclick="dismissFeedback()" title="Bỏ qua">✕</button>
+-    </div>
+-    <div class="feedback-body">
+-    <div class="stars">
+-      <span class="star" data-value="1">⭐</span>
+-      <span class="star" data-value="2">⭐</span>
+-      <span class="star" data-value="3">⭐</span>
+-      <span class="star" data-value="4">⭐</span>
+-      <span class="star" data-value="5">⭐</span>
+-    </div>
+-    <textarea id="feedbackText" placeholder="Chia sẻ trải nghiệm của bạn..." style="width:100%;min-height:64px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;font-size:12px;font-family:inherit;resize:none;"></textarea>
+-    <button onclick="submitFeedback()" style="margin-top:8px;width:100%;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#0a0c12;border:none;border-radius:8px;padding:9px;font-weight:700;cursor:pointer;font-size:13px;">Gửi đánh giá</button>
+-    <p id="feedbackMessage" style="margin-top:6px;color:var(--text-muted);font-size:11px;"></p>
+-    </div>
+-  </div>
+-</div>
+-
+-<div id="map-container">
+-  <div id="loading"><div class="spinner"></div><p>Đang tính toán lộ trình...</p></div>
+-  <div id="map"></div>
+-</div>
+-
+-<!-- Toast trọng số -->
+-<div id="weight-toast">
+-  <div class="toast-title">🧠 Hồ sơ sở thích đã cập nhật</div>
+-  <div class="weight-row"><span>☕ Cà phê</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-cafe" style="width:50%"></div></div><span class="weight-arrow" id="twa-cafe"></span><span class="weight-val" id="twv-cafe">1.00</span></div>
+-  <div class="weight-row"><span>🌿 Thiên nhiên</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-nature" style="width:50%"></div></div><span class="weight-arrow" id="twa-nature"></span><span class="weight-val" id="twv-nature">1.00</span></div>
+-  <div class="weight-row"><span>🍜 Ăn uống</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-food" style="width:50%"></div></div><span class="weight-arrow" id="twa-food"></span><span class="weight-val" id="twv-food">1.00</span></div>
+-  <div class="weight-row"><span>📸 Check-in</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-checkin" style="width:50%"></div></div><span class="weight-arrow" id="twa-checkin"></span><span class="weight-val" id="twv-checkin">1.00</span></div>
+-</div>
+-
+-<div id="thankPopup" class="popup">
+-  <div class="popup-content">
+-    <h2>💖 Cảm ơn bạn!</h2>
+-    <p>Chúc bạn có trải nghiệm tuyệt vời cùng TikTokRoute!</p>
+-    <button onclick="closePopup()">Đóng</button>
+-  </div>
+-</div>
+-
+-<script>
+-const USER_TOKEN = "{{ user_token }}";
+-const map = L.map('map', { zoomControl: false }).setView([11.9404, 108.4583], 13);
+-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB', maxZoom: 19 }).addTo(map);
+-L.control.zoom({ position: 'bottomright' }).addTo(map);
+-
+-let allLayers = [];
+-let selectedTypes = new Set();
+-let anchorPOIs = [];
+-let startLocation = null;
+-let pickingStartLocation = false;
+-let startMarker = null;
+-let selectedRating = 0;
+-let currentRouteId = null;
+-
+-function toggleForm() {
+-  const formSection = document.getElementById('form-section');
+-  const btn = document.getElementById('btn-reopen-form');
+-  if (formSection.classList.contains('collapsed')) {
+-    formSection.classList.remove('collapsed');
+-    if (btn) btn.textContent = '⚙ Thu gọn';
+-  } else {
+-    formSection.classList.add('collapsed');
+-    if (btn) btn.textContent = '⚙ Cài đặt';
+-  }
+-}
+-
+-function detectLocation() {
+-  if (!navigator.geolocation) { alert('Trình duyệt không hỗ trợ định vị.'); return; }
+-  const badge = document.getElementById('sl-badge');
+-  badge.textContent = '📡 Đang xác định vị trí...';
+-  navigator.geolocation.getCurrentPosition(
+-    pos => setStartLocation(pos.coords.latitude, pos.coords.longitude, '📡 Vị trí của tôi'),
+-    err => { badge.textContent = '🏔 Mặc định: Trung tâm Đà Lạt'; alert('Không lấy được vị trí: ' + err.message); },
+-    { timeout: 8000 }
+-  );
+-}
+-
+-function pickOnMap() {
+-  pickingStartLocation = true;
+-  document.getElementById('sl-badge').textContent = '🖱 Bấm vào bản đồ để chọn điểm xuất phát...';
+-  map.getContainer().style.cursor = 'crosshair';
+-}
+-
+-function setStartLocation(lat, lng, label) {
+-  startLocation = { lat, lng };
+-  document.getElementById('sl-badge').innerHTML = '📍 ' + label + ' (' + lat.toFixed(4) + ', ' + lng.toFixed(4) + ')';
+-  document.getElementById('sl-clear').style.display = 'block';
+-  if (startMarker) map.removeLayer(startMarker);
+-  const icon = L.divIcon({ className: '', html: '<div style="background:#d4b87a;color:#0a0c12;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);">🏁</div>', iconSize:[28,28], iconAnchor:[14,14] });
+-  startMarker = L.marker([lat, lng], {icon}).bindPopup('📍 Điểm xuất phát').addTo(map);
+-  map.setView([lat, lng], 15);
+-}
+-
+-function clearStartLocation() {
+-  startLocation = null;
+-  document.getElementById('sl-badge').textContent = '🏔 Mặc định: Trung tâm Đà Lạt';
+-  document.getElementById('sl-clear').style.display = 'none';
+-  if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
+-}
+-
+-map.on('click', function(e) {
+-  if (!pickingStartLocation) return;
+-  pickingStartLocation = false;
+-  map.getContainer().style.cursor = '';
+-  setStartLocation(e.latlng.lat, e.latlng.lng, 'Điểm chọn trên bản đồ');
+-});
+-
+-fetch('/api/poi_types').then(r=>r.json()).then(types => {
+-  const container = document.getElementById('type-filters');
+-  types.forEach(t => {
+-    const pill = document.createElement('div');
+-    pill.className = 'type-pill';
+-    pill.dataset.type = t.value;
+-    pill.textContent = t.emoji + ' ' + t.label;
+-    pill.onclick = () => toggleType(t.value, pill);
+-    container.appendChild(pill);
+-  });
+-});
+-
+-function toggleType(type, pill) {
+-  if (type === 'all') {
+-    selectedTypes.clear();
+-    document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
+-    pill.classList.add('active');
+-    return;
+-  }
+-  document.querySelector('[data-type=all]').classList.remove('active');
+-  if (selectedTypes.has(type)) {
+-    selectedTypes.delete(type);
+-    pill.classList.remove('active');
+-    if (selectedTypes.size === 0) document.querySelector('[data-type=all]').classList.add('active');
+-  } else {
+-    selectedTypes.add(type);
+-    pill.classList.add('active');
+-  }
+-}
+-
+-let anchorDebounce;
+-async function searchAnchor(q) {
+-  clearTimeout(anchorDebounce);
+-  const drop = document.getElementById('anchor-drop');
+-  if (!q.trim()) { drop.style.display='none'; return; }
+-  anchorDebounce = setTimeout(async () => {
+-    const res = await fetch('/api/search_poi?q='+encodeURIComponent(q));
+-    const items = await res.json();
+-    if (!items.length) { drop.style.display='none'; return; }
+-    drop.innerHTML = items.map(it => `<div class="anchor-drop-item" onclick="addAnchor('${esc(it.name)}','${it.emoji}','${esc(it.type)}')"><span>${it.emoji}</span><span style="flex:1">${it.name}</span><span style="color:var(--text-muted);font-size:11px">⭐${it.rating}</span></div>`).join('');
+-    drop.style.display='block';
+-  }, 220);
+-}
+-function addAnchor(name, emoji, type_vi) {
+-  if (anchorPOIs.find(a=>a.name===name)) { closeAnchorDrop(); return; }
+-  anchorPOIs.push({name, emoji, type_vi});
+-  renderAnchorTags();
+-  document.getElementById('anchor-input').value = '';
+-  closeAnchorDrop();
+-}
+-function removeAnchor(name) { anchorPOIs = anchorPOIs.filter(a=>a.name!==name); renderAnchorTags(); }
+-function renderAnchorTags() {
+-  const container = document.getElementById('anchor-tags');
+-  container.innerHTML = anchorPOIs.map(a => `<div class="anchor-tag">${a.emoji} ${a.name}<button onclick="removeAnchor('${esc(a.name)}')">×</button></div>`).join('');
+-}
+-function closeAnchorDrop() { document.getElementById('anchor-drop').style.display='none'; }
+-document.addEventListener('click', e => { if (!e.target.closest('#anchor-section')) closeAnchorDrop(); });
+-document.getElementById('anchor-input').addEventListener('input', e => searchAnchor(e.target.value));
+-document.getElementById('anchor-input').addEventListener('keydown', e => { if(e.key==='Escape') closeAnchorDrop(); });
+-
+-async function optimize() {
+-  const btn = document.getElementById('btn-optimize');
+-  btn.disabled = true;
+-  document.getElementById('loading').classList.add('show');
+-  const preferences = {
+-    adventure: document.getElementById('pref_adventure').checked,
+-    relax: document.getElementById('pref_relax').checked,
+-    food: document.getElementById('pref_food').checked,
+-    checkin: document.getElementById('pref_checkin').checked,
+-  };
+-  const payload = {
+-    num_days: parseInt(document.getElementById('num_days').value),
+-    top_k: parseInt(document.getElementById('top_k').value),
+-    start_hour: parseInt(document.getElementById('start_hour').value),
+-    end_hour: parseInt(document.getElementById('end_hour').value),
+-    types: [...selectedTypes],
+-    anchor_pois: anchorPOIs.map(a=>a.name),
+-    preferences: preferences,
+-    start_location: startLocation,
+-  };
+-  try {
+-    const res = await fetch('/api/optimize', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+-    const data = await res.json();
+-    renderResult(data);
+-    const formSection = document.getElementById('form-section');
+-    if (!formSection.classList.contains('collapsed')) {
+-      formSection.classList.add('collapsed');
+-    }
+-    // Hiện nút mở lại form
+-    document.getElementById('btn-reopen-form').style.display = 'inline-flex';
+-    document.getElementById('feedback-container').style.display = 'block';
+-  } catch(e) { alert('Lỗi: '+e.message); }
+-  finally { btn.disabled=false; document.getElementById('loading').classList.remove('show'); }
+-}
+-
+-function renderResult(data) {
+-  currentRouteId = data.route_id || null;
+-  allLayers.forEach(l => map.removeLayer(l));
+-  allLayers = [];
+-  const s = data.summary;
+-  document.getElementById('s-km').innerHTML = s.total_km;
+-  document.getElementById('s-rate').innerHTML = s.rate;
+-  document.getElementById('s-stops').innerHTML = s.feasible + '/' + s.total_stops;
+-  document.getElementById('summary-bar').style.display = 'flex';
+-
+-  let html = '';
+-  data.days.forEach(day => {
+-    const travelMins = Math.round(day.km / 30 * 60);
+-    html += `<div class="day-section">
+-      <div class="day-header" onclick="toggleDay(this)">
+-        <div class="day-dot" style="background:${day.color}"></div>
+-        <h3>Ngày ${day.day}</h3>
+-        <div class="day-stats">
+-          <span>🛣️ ${day.km} km</span>
+-          <span>🕒 ${travelMins} phút</span>
+-          <span>✅ ${day.feasible}/${day.total}</span>
+-        </div>
+-        <span style="font-size:12px;">▼</span>
+-      </div>
+-      <div class="day-stops" style="display:block;">`;
+-    day.stops.forEach(stop => {
+-      const cls = stop.feasible ? '' : ' infeasible';
+-      html += `<div class="stop-item${cls}" onclick="focusStop(${stop.lat},${stop.lng},'${esc(stop.name)}')">
+-        <div class="stop-num" style="background:${day.color}">${stop.idx}</div>
+-        <div class="stop-body">
+-          <div class="stop-name">${stop.emoji} ${stop.name} ${stop.anchor ? '<span class="badge-anchor">📌 bắt buộc</span>' : ''}</div>
+-          <div class="stop-meta">
+-            <span class="stop-time">🕐 ${stop.start} – ${stop.end}</span>
+-            <span>${stop.type_vi}</span>
+-            ${stop.rating ? `<span>⭐ ${stop.rating}</span>` : ''}
+-            ${stop.visit_min ? `<span>⏱ ${stop.visit_min} phút</span>` : ''}
+-            ${!stop.feasible ? '<span class="badge-infeasible">⚠️ ngoài giờ</span>' : ''}
+-          </div>
+-        </div>
+-      </div>`;
+-    });
+-    html += `</div></div>`;
+-  });
+-  document.getElementById('timeline').innerHTML = html;
+-
+-  const bounds = [];
+-  data.days.forEach(day => {
+-    const coords = [];
+-    day.stops.forEach(stop => {
+-      const latlng = [stop.lat, stop.lng];
+-      coords.push(latlng);
+-      bounds.push(latlng);
+-      const icon = L.divIcon({ className: '', html: `<div style="background:${day.color};color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);opacity:${stop.feasible?1:0.45};">${stop.idx}</div>`, iconSize:[32,32], iconAnchor:[16,16] });
+-      const popupHtml = `<div class="map-popup"><b>${stop.name}</b><br><div class="meta">${stop.emoji} ${stop.type_vi} | Ngày ${day.day} #${stop.idx}</div>🕐 ${stop.start}–${stop.end} ${stop.feasible?'✅':'⚠️'}<br>⭐ <span class="rating-stars">${'★'.repeat(Math.round(stop.rating))}${'☆'.repeat(5-Math.round(stop.rating))}</span><br>${stop.address?`📍 ${stop.address.substring(0,60)}<br>`:''}${stop.video_url?`<a href="${stop.video_url}" target="_blank">🎬 TikTok</a>`:''}</div>`;
+-      const marker = L.marker(latlng, {icon}).bindPopup(popupHtml, {maxWidth:280}).addTo(map);
+-      allLayers.push(marker);
+-    });
+-    if (coords.length >= 2) {
+-      // Lấy polyline thực tế từ OSRM
+-      fetch("/api/route_polyline", {
+-        method: "POST",
+-        headers: {"Content-Type": "application/json"},
+-        body: JSON.stringify({ coords: coords.map(c => ({ lat: c[0], lng: c[1] })) })
+-      })
+-      .then(r => r.json())
+-      .then(data => {
+-        const points = data.polyline && data.polyline.length > 0 ? data.polyline : coords;
+-        const line = L.polyline(points, { color: day.color, weight: 4, opacity: 0.8, dashArray: '8 6', lineCap: 'round', lineJoin: 'round' }).addTo(map);
+-        allLayers.push(line);
+-      });
+-    }
+-  });
+-  if (bounds.length) map.fitBounds(bounds, {padding:[40,40]});
+-  if (startMarker) startMarker.addTo(map);
+-
+-  const weatherBanner = document.getElementById('weather-banner');
+-  if (data.weather && data.weather.outdoor_removed) {
+-    const rainyCount = data.weather.rainy_days.filter(Boolean).length;
+-    const total = data.weather.rainy_days.length;
+-    weatherBanner.innerHTML = '🌧 Dự báo mưa ' + rainyCount + '/' + total + ' ngày — đã ẩn địa điểm ngoài trời (núi, thác, check-in). Bỏ tick sở thích Mạo hiểm để xem thêm.';
+-    weatherBanner.style.display = 'block';
+-  } else {
+-    weatherBanner.style.display = 'none';
+-  }
+-
+-  // Cập nhật trọng số nếu server trả về
+-  if (data.weights) {
+-    renderWeightPanel(data.weights);
+-    showWeightToast(data.weights);
+-  }
+-}
+-
+-function toggleDay(header) {
+-  const stopsDiv = header.nextElementSibling;
+-  if (stopsDiv.style.display === 'none') stopsDiv.style.display = 'block';
+-  else stopsDiv.style.display = 'none';
+-}
+-function focusStop(lat, lng, name) {
+-  map.setView([lat, lng], 16);
+-  allLayers.forEach(l => { if (l.getLatLng && Math.abs(l.getLatLng().lat-lat)<0.0001) l.openPopup(); });
+-}
+-function esc(s) { return (s||'').replace(/'/g,"\\'"); }
+-
+-// Khởi tạo sự kiện cho các sao
+-function initStars() {
+-  const stars = document.querySelectorAll('.star');
+-  stars.forEach(star => {
+-    star.addEventListener('click', () => {
+-      const value = parseInt(star.dataset.value);
+-      selectedRating = value;
+-      stars.forEach((s, idx) => {
+-        if (idx < value) s.classList.add('selected');
+-        else s.classList.remove('selected');
+-      });
+-    });
+-  });
+-}
+-initStars();
+-
+-async function submitFeedback() {
+-  if (selectedRating === 0) {
+-    alert('Vui lòng chọn số sao đánh giá!');
+-    return;
+-  }
+-  const feedback = document.getElementById("feedbackText").value;
+-  const response = await fetch("/submit-feedback", {
+-    method: "POST",
+-    headers: { "Content-Type": "application/json" },
+-    body: JSON.stringify({ rating: selectedRating, feedback: feedback, route_id: currentRouteId })
+-  });
+-  const result = await response.json();
+-  document.getElementById("feedbackMessage").innerText = result.message;
+-  dismissFeedback();
+-  selectedRating = 0;
+-  document.getElementById("feedbackText").value = '';
+-  document.querySelectorAll('.star').forEach(s => s.classList.remove('selected'));
+-  document.getElementById("thankPopup").style.display = "flex";
+-}
+-function dismissFeedback() {
+-  const fc = document.getElementById('feedback-container');
+-  fc.style.transition = 'opacity 0.25s, transform 0.25s';
+-  fc.style.opacity = '0';
+-  fc.style.transform = 'translateY(10px)';
+-  setTimeout(() => { fc.style.display = 'none'; fc.style.opacity = ''; fc.style.transform = ''; }, 260);
+-}
+-function closePopup() { document.getElementById("thankPopup").style.display = "none"; }
+-
+-// ── Drag & drop cho feedback card ──────────────────────────────
+-(function initFeedbackDrag() {
+-  const fc = document.getElementById('feedback-container');
+-  const handle = document.getElementById('feedback-drag-handle');
+-  let dragging = false, ox = 0, oy = 0;
+-
+-  handle.addEventListener('mousedown', e => {
+-    dragging = true;
+-    // Nếu đang dùng bottom/right, chuyển sang top/left tuyệt đối
+-    if (fc.style.top === '') {
+-      const rect = fc.getBoundingClientRect();
+-      fc.style.top  = rect.top  + 'px';
+-      fc.style.left = rect.left + 'px';
+-      fc.style.bottom = 'unset';
+-      fc.style.right  = 'unset';
+-    }
+-    ox = e.clientX - fc.getBoundingClientRect().left;
+-    oy = e.clientY - fc.getBoundingClientRect().top;
+-    fc.style.transition = 'none';
+-    fc.style.userSelect = 'none';
+-    e.preventDefault();
+-  });
+-
+-  // Touch support
+-  handle.addEventListener('touchstart', e => {
+-    const t = e.touches[0];
+-    dragging = true;
+-    if (fc.style.top === '') {
+-      const rect = fc.getBoundingClientRect();
+-      fc.style.top  = rect.top  + 'px';
+-      fc.style.left = rect.left + 'px';
+-      fc.style.bottom = 'unset';
+-      fc.style.right  = 'unset';
+-    }
+-    ox = t.clientX - fc.getBoundingClientRect().left;
+-    oy = t.clientY - fc.getBoundingClientRect().top;
+-    fc.style.transition = 'none';
+-    e.preventDefault();
+-  }, { passive: false });
+-
+-  function onMove(cx, cy) {
+-    if (!dragging) return;
+-    let nx = cx - ox;
+-    let ny = cy - oy;
+-    // Giữ trong viewport
+-    nx = Math.max(0, Math.min(window.innerWidth  - fc.offsetWidth,  nx));
+-    ny = Math.max(0, Math.min(window.innerHeight - fc.offsetHeight, ny));
+-    fc.style.left = nx + 'px';
+-    fc.style.top  = ny + 'px';
+-  }
+-
+-  document.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+-  document.addEventListener('touchmove', e => { if(dragging) onMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+-
+-  function stopDrag() {
+-    dragging = false;
+-    fc.style.userSelect = '';
+-  }
+-  document.addEventListener('mouseup',  stopDrag);
+-  document.addEventListener('touchend', stopDrag);
+-})();
+-
+-// ── Trọng số cá nhân ──────────────────────────────────────────
+-// Chuyển weight (0.5-2.0) → % thanh (0-100%)
+-function weightToPct(w) { return Math.round(((w - 0.5) / 1.5) * 100); }
+-
+-let _prevWeights = null;
+-let _toastTimer = null;
+-
+-function renderWeightPanel(w) {
+-  const panel = document.getElementById('weights-panel');
+-  panel.style.display = 'block';
+-  const cats = ['cafe','nature','food','checkin'];
+-  cats.forEach(c => {
+-    const pct = weightToPct(w[c]);
+-    document.getElementById(`wb-${c}`).style.width = pct + '%';
+-    document.getElementById(`wv-${c}`).textContent = w[c].toFixed(2);
+-  });
+-}
+-
+-function showWeightToast(w) {
+-  const cats = ['cafe','nature','food','checkin'];
+-  cats.forEach(c => {
+-    const pct = weightToPct(w[c]);
+-    document.getElementById(`twb-${c}`).style.width = pct + '%';
+-    document.getElementById(`twv-${c}`).textContent = w[c].toFixed(2);
+-    let arrow = '';
+-    if (_prevWeights) {
+-      if (w[c] > _prevWeights[c]) arrow = '<span style="color:#4ade80">↑</span>';
+-      else if (w[c] < _prevWeights[c]) arrow = '<span style="color:#f87171">↓</span>';
+-    }
+-    document.getElementById(`twa-${c}`).innerHTML = arrow;
+-  });
+-  _prevWeights = {...w};
+-
+-  const toast = document.getElementById('weight-toast');
+-  toast.classList.add('show');
+-  if (_toastTimer) clearTimeout(_toastTimer);
+-  _toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+-}
+-
+-async function loadInitialWeights() {
+-  try {
+-    const res = await fetch('/api/user_weights');
+-    const w = await res.json();
+-    _prevWeights = {...w};
+-    renderWeightPanel(w);
+-  } catch(e) { console.warn('Không tải được trọng số:', e); }
+-}
+-
+-async function resetWeights() {
+-  try {
+-    const res = await fetch('/api/user_weights/reset', { method: 'POST' });
+-    const data = await res.json();
+-    if (data.success) {
+-      renderWeightPanel(data.weights);
+-      showWeightToast(data.weights);
+-    }
+-  } catch(e) { console.warn('Reset thất bại:', e); }
+-}
+-
+-// Tải weights khi khởi động
+-loadInitialWeights();
+-</script>
+-</body>
+-</html>
+-"""
+ 
+ if __name__ == "__main__":
+     if not os.path.exists(POI_CSV):
+diff --git a/webapp/static/css/style.css b/webapp/static/css/style.css
+new file mode 100644
+index 0000000..85323e6
+--- /dev/null
++++ b/webapp/static/css/style.css
+@@ -0,0 +1,536 @@
++:root {
++  --bg: #0a0c12;
++  --surface: #141822;
++  --surface-light: #1e2432;
++  --border: #2a2f3f;
++  --accent: #d4b87a;
++  --accent-dark: #b89a5c;
++  --accent-glow: rgba(212,184,122,0.2);
++  --text: #f0f2f5;
++  --text-muted: #9ca3af;
++}
++* { margin:0; padding:0; box-sizing:border-box; }
++body {
++  font-family: 'Inter', sans-serif;
++  background: var(--bg);
++  color: var(--text);
++  height: 100vh;
++  display: flex;
++  overflow: hidden;
++}
++::-webkit-scrollbar { width: 6px; }
++::-webkit-scrollbar-track { background: transparent; }
++::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
++#sidebar {
++  width: 420px;
++  min-width: 360px;
++  background: var(--surface);
++  border-right: 1px solid var(--border);
++  display: flex;
++  flex-direction: column;
++  overflow: hidden;
++  height: 100vh;
++  overflow-y: auto;
++  overflow-x: hidden;
++  z-index: 10;
++}
++.sidebar-header {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  padding: 16px 20px;
++  border-bottom: 1px solid var(--border);
++  background: linear-gradient(135deg, #0a0c12 0%, #141822 100%);
++}
++.sidebar-header h1 {
++  font-family: 'Playfair Display', serif;
++  font-size: 22px;
++  background: linear-gradient(135deg, var(--accent), #f5e6c4);
++  -webkit-background-clip: text;
++  background-clip: text;
++  color: transparent;
++}
++#form-section {
++  background: rgba(20,24,34,0.6);
++  border-bottom: 1px solid var(--border);
++  transition: max-height 0.4s ease, padding 0.3s;
++  overflow-y: auto;
++  padding: 0 20px;
++  max-height: 600px;
++}
++#form-section.collapsed {
++  max-height: 0 !important;
++  padding: 0 20px !important;
++  border-bottom: none;
++}
++#form-inner {
++  padding: 20px 0;
++}
++.form-row-compact {
++  display: flex;
++  gap: 12px;
++  margin-bottom: 16px;
++}
++.form-group {
++  flex: 1;
++}
++.form-group label {
++  display: block;
++  font-size: 10px;
++  font-weight: 600;
++  color: var(--text-muted);
++  text-transform: uppercase;
++  letter-spacing: 0.5px;
++  margin-bottom: 4px;
++}
++.form-group input, .form-group select {
++  width: 100%;
++  background: var(--bg);
++  border: 1px solid var(--border);
++  border-radius: 10px;
++  color: var(--text);
++  padding: 8px 10px;
++  font-size: 13px;
++  font-family: 'Inter', sans-serif;
++}
++#type-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
++.type-pill {
++  background: var(--bg);
++  border: 1px solid var(--border);
++  border-radius: 30px;
++  padding: 4px 10px;
++  font-size: 11px;
++  cursor: pointer;
++}
++.type-pill.active { background: var(--accent); border-color: var(--accent); color: #0a0c12; }
++.preference-group {
++  display: grid;
++  grid-template-columns: 1fr 1fr;
++  gap: 8px;
++  margin: 8px 0 12px;
++}
++.preference-group label {
++  display: flex;
++  align-items: center;
++  gap: 6px;
++  font-size: 11px;
++  background: var(--bg);
++  border: 1px solid var(--border);
++  border-radius: 8px;
++  padding: 6px 8px;
++  cursor: pointer;
++}
++#anchor-section {
++  margin: 8px 0 12px;
++}
++#anchor-input {
++  background: var(--bg);
++  border: 1px solid var(--border);
++  border-radius: 10px;
++  color: var(--text);
++  padding: 8px 10px 8px 32px;
++  font-size: 13px;
++  font-family: 'Inter', sans-serif;
++  width: 100%;
++  outline: none;
++  transition: border-color 0.2s;
++  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%23d4b87a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>');
++  background-repeat: no-repeat;
++  background-position: 10px center;
++}
++#anchor-input:focus {
++  border-color: var(--accent);
++  box-shadow: 0 0 0 2px var(--accent-glow);
++}
++#anchor-drop {
++  background: var(--surface);
++  border: 1px solid var(--accent);
++  border-radius: 12px;
++  box-shadow: 0 8px 20px rgba(0,0,0,0.5);
++  overflow: hidden;
++}
++.anchor-drop-item {
++  padding: 10px 14px;
++  font-size: 13px;
++  cursor: pointer;
++  display: flex;
++  gap: 12px;
++  align-items: center;
++  transition: background 0.15s;
++  border-bottom: 1px solid var(--border);
++}
++.anchor-drop-item:last-child { border-bottom: none; }
++.anchor-drop-item:hover { background: var(--surface-light); }
++.anchor-tag {
++  display: inline-flex;
++  align-items: center;
++  gap: 6px;
++  background: rgba(212,184,122,0.15);
++  border: 1px solid var(--accent);
++  border-radius: 40px;
++  padding: 4px 10px 4px 12px;
++  font-size: 12px;
++  color: var(--accent);
++}
++.anchor-tag button {
++  background: none;
++  border: none;
++  color: var(--accent);
++  font-size: 16px;
++  cursor: pointer;
++  margin-left: 4px;
++  line-height: 1;
++}
++.anchor-tag button:hover {
++  color: #ff5e5e;
++}
++#start-location-section {
++  margin-bottom: 8px;
++  padding: 8px 10px;
++  background: var(--bg);
++  border: 1px solid var(--border);
++  border-radius: 8px;
++}
++#start-location-section .sl-row {
++  display: flex; gap: 8px; align-items: center; margin-top: 6px;
++}
++#start-location-section .sl-badge {
++  display: flex; align-items: center; gap: 6px;
++  font-size: 11px; color: var(--accent);
++  background: rgba(212,184,122,0.1); border: 1px solid var(--accent);
++  border-radius: 6px; padding: 3px 8px; flex: 1;
++}
++#start-location-section .sl-btn {
++  background: var(--surface-light); border: 1px solid var(--border);
++  color: var(--text-muted); border-radius: 6px; padding: 4px 8px;
++  font-size: 11px; cursor: pointer; white-space: nowrap;
++}
++#start-location-section .sl-btn:hover { border-color: var(--accent); color: var(--accent); }
++#btn-optimize {
++  width: 100%;
++  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
++  color: #0a0c12;
++  border: none;
++  border-radius: 12px;
++  padding: 10px;
++  font-size: 14px;
++  font-weight: 700;
++  cursor: pointer;
++  margin-top: 12px;
++}
++#summary-bar {
++  display: none;
++  padding: 12px 20px;
++  background: rgba(212,184,122,0.08);
++  border-bottom: 1px solid var(--border);
++  justify-content: space-around;
++  text-align: center;
++}
++.summary-item {
++  flex: 1;
++}
++.summary-item .label {
++  font-size: 11px;
++  color: var(--text-muted);
++  text-transform: uppercase;
++}
++.summary-item .value {
++  font-size: 22px;
++  font-weight: 700;
++  color: var(--accent);
++  line-height: 1.2;
++}
++.summary-item .unit {
++  font-size: 12px;
++  color: var(--text-muted);
++}
++#weather-banner {
++  padding: 8px 16px;
++  background: rgba(96,165,250,0.1);
++  border-bottom: 1px solid rgba(96,165,250,0.3);
++  font-size: 11px;
++  color: #93c5fd;
++  display: none;
++}
++#timeline {
++  flex: 1;
++  overflow-y: auto;
++  padding: 0;
++}
++.day-section { border-bottom: 1px solid var(--border); }
++.day-header {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++  padding: 12px 20px;
++  background: var(--surface-light);
++  cursor: pointer;
++}
++.day-dot { width: 10px; height: 10px; border-radius: 50%; }
++.day-header h3 { font-size: 14px; font-weight: 600; flex: 1; }
++.day-stats { font-size: 10px; color: var(--text-muted); display: flex; gap: 12px; }
++.stop-item {
++  display: flex;
++  gap: 12px;
++  padding: 8px 20px 8px 36px;
++  cursor: pointer;
++  border-left: 3px solid transparent;
++  transition: 0.25s;
++  border: 1px solid rgba(255,255,255,0.05);
++}
++.stop-item:hover {
++  transform: translateX(8px);
++  background: rgba(255,255,255,0.05);
++  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
++}
++.stop-num {
++  width: 24px; height: 24px;
++  border-radius: 50%;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  font-size: 10px;
++  font-weight: 700;
++  color: white;
++}
++.stop-body { flex: 1; min-width: 0; }
++.stop-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
++.stop-meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 10px; }
++/* Popup marker - không viền trắng dày, bóng mờ nhẹ */
++.map-popup {
++  background: rgba(20,20,25,0.95);
++  color: white;
++  border-radius: 12px;
++  padding: 6px 10px;
++  backdrop-filter: blur(6px);
++  border: none;
++  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
++  font-size: 12px;
++  line-height: 1.4;
++}
++.map-popup b {
++  font-size: 14px;
++  color: #f0d79a;
++}
++.map-popup .meta {
++  opacity: 0.8;
++  margin: 2px 0;
++  font-size: 11px;
++}
++.map-popup .rating-stars {
++  display: inline-block;
++  font-size: 12px;
++  letter-spacing: 2px;
++  color: #ffcc00;
++}
++.stop-time { color: var(--accent); font-weight: 500; }
++.badge-infeasible { background: rgba(255,94,94,0.15); color: #ff5e5e; padding: 2px 8px; border-radius: 20px; font-size: 10px; }
++.badge-anchor { background: rgba(212,184,122,0.15); color: var(--accent); padding: 2px 8px; border-radius: 20px; font-size: 10px; }
++#map-container { flex: 1; position: relative; }
++#map { width: 100%; height: 100%; }
++#loading {
++  display: none;
++  position: absolute;
++  inset: 0;
++  background: rgba(10,12,18,0.9);
++  backdrop-filter: blur(4px);
++  z-index: 1000;
++  align-items: center;
++  justify-content: center;
++  flex-direction: column;
++  gap: 16px;
++}
++#loading.show { display: flex; }
++.spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
++@keyframes spin { to { transform: rotate(360deg); } }
++/* Feedback container — floating card góc dưới phải (trên bản đồ) */
++#feedback-container {
++  display: none;
++  position: fixed;
++  bottom: 24px;
++  right: 24px;
++  width: 290px;
++  z-index: 9998;
++  animation: feedbackSlideUp 0.35s cubic-bezier(0.34,1.56,0.64,1);
++}
++@keyframes feedbackSlideUp {
++  from { opacity: 0; transform: translateY(20px) scale(0.96); }
++  to   { opacity: 1; transform: translateY(0) scale(1); }
++}
++.feedback-box {
++  background: var(--surface-light);
++  border: 1px solid var(--border);
++  border-radius: 14px;
++  overflow: hidden;
++  box-shadow: 0 8px 28px rgba(0,0,0,0.55);
++  position: relative;
++}
++#feedback-drag-handle {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  padding: 10px 12px 8px;
++  background: rgba(212,184,122,0.08);
++  border-bottom: 1px solid var(--border);
++  cursor: grab;
++  user-select: none;
++  font-size: 13px;
++  font-weight: 600;
++}
++#feedback-drag-handle:active { cursor: grabbing; }
++.feedback-drag-dots {
++  font-size: 11px;
++  letter-spacing: 1px;
++  color: var(--text-muted);
++  margin-right: 6px;
++  pointer-events: none;
++}
++.feedback-body { padding: 10px 14px 12px; }
++.feedback-dismiss {
++  background: none;
++  border: none;
++  color: var(--text-muted);
++  font-size: 15px;
++  cursor: pointer;
++  line-height: 1;
++  padding: 2px 4px;
++  border-radius: 4px;
++  transition: color 0.15s;
++  flex-shrink: 0;
++}
++.feedback-dismiss:hover { color: var(--text); }
++.stars {
++  display: flex;
++  gap: 4px;
++  margin: 6px 0;
++}
++.star {
++  cursor: pointer;
++  font-size: 22px;
++  transition: 0.1s;
++  display: inline-block;
++}
++.star.selected {
++  color: #ffcc00;
++  filter: drop-shadow(0 0 2px gold);
++}
++.star:hover {
++  transform: scale(1.1);
++}
++.popup {
++  display: none;
++  position: fixed;
++  z-index: 999;
++  left: 0;
++  top: 0;
++  width: 100%;
++  height: 100%;
++  background: rgba(0,0,0,0.5);
++  justify-content: center;
++  align-items: center;
++}
++.popup-content {
++  background: white;
++  padding: 30px;
++  border-radius: 20px;
++  text-align: center;
++  width: 320px;
++  animation: popupShow 0.3s ease;
++  color: #222;
++}
++.popup-content h2 { color: #ff4d6d; font-size: 32px; margin-bottom: 10px; }
++.popup-content p { color: #444; font-size: 18px; line-height: 1.5; }
++.popup-content button { margin-top: 15px; background: #ff4d6d; color: white; border: none; padding: 10px 18px; border-radius: 10px; cursor: pointer; }
++@keyframes popupShow { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
++
++/* ── Toast thông báo trọng số ── */
++#weight-toast {
++  position: fixed;
++  bottom: 24px;
++  right: 24px;
++  background: var(--surface-light);
++  border: 1px solid var(--accent);
++  border-radius: 12px;
++  padding: 12px 16px;
++  min-width: 260px;
++  max-width: 340px;
++  z-index: 9999;
++  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
++  transform: translateY(20px);
++  opacity: 0;
++  transition: opacity 0.3s, transform 0.3s;
++  pointer-events: none;
++}
++#weight-toast.show {
++  opacity: 1;
++  transform: translateY(0);
++  pointer-events: auto;
++}
++#weight-toast .toast-title {
++  font-size: 12px;
++  font-weight: 600;
++  color: var(--accent);
++  margin-bottom: 8px;
++}
++.weight-row {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  font-size: 11px;
++  margin: 4px 0;
++  color: var(--text);
++}
++.weight-bar-bg {
++  flex: 1;
++  height: 5px;
++  background: var(--border);
++  border-radius: 3px;
++  overflow: hidden;
++}
++.weight-bar-fill {
++  height: 100%;
++  background: var(--accent);
++  border-radius: 3px;
++  transition: width 0.4s ease;
++}
++.weight-val {
++  font-size: 11px;
++  color: var(--text-muted);
++  width: 34px;
++  text-align: right;
++}
++.weight-arrow { font-size: 12px; width: 14px; }
++
++/* ── Panel trọng số trong sidebar ── */
++#weights-panel {
++  padding: 12px 20px;
++  border-bottom: 1px solid var(--border);
++  display: none;
++}
++#weights-panel .wp-header {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  margin-bottom: 8px;
++}
++#weights-panel .wp-title {
++  font-size: 11px;
++  font-weight: 600;
++  color: var(--text-muted);
++  text-transform: uppercase;
++  letter-spacing: 0.5px;
++}
++#weights-panel .wp-reset {
++  font-size: 11px;
++  color: var(--accent);
++  background: none;
++  border: 1px solid var(--accent);
++  border-radius: 20px;
++  padding: 2px 10px;
++  cursor: pointer;
++  transition: 0.2s;
++}
++#weights-panel .wp-reset:hover {
++  background: var(--accent);
++  color: #0a0c12;
++}
+diff --git a/webapp/static/js/app.js b/webapp/static/js/app.js
+new file mode 100644
+index 0000000..8a1895f
+--- /dev/null
++++ b/webapp/static/js/app.js
+@@ -0,0 +1,435 @@
++// USER_TOKEN được set bởi 1 đoạn <script> nhỏ inline trong templates/index.html
++// (file .js tĩnh này không được Flask/Jinja xử lý nên không thể chèn
++// {{ user_token }} trực tiếp vào đây).
++const USER_TOKEN = window.USER_TOKEN;
++const map = L.map('map', { zoomControl: false }).setView([11.9404, 108.4583], 13);
++L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB', maxZoom: 19 }).addTo(map);
++L.control.zoom({ position: 'bottomright' }).addTo(map);
++
++let allLayers = [];
++let selectedTypes = new Set();
++let anchorPOIs = [];
++let startLocation = null;
++let pickingStartLocation = false;
++let startMarker = null;
++let selectedRating = 0;
++let currentRouteId = null;
++
++function toggleForm() {
++  const formSection = document.getElementById('form-section');
++  const btn = document.getElementById('btn-reopen-form');
++  if (formSection.classList.contains('collapsed')) {
++    formSection.classList.remove('collapsed');
++    if (btn) btn.textContent = '⚙ Thu gọn';
++  } else {
++    formSection.classList.add('collapsed');
++    if (btn) btn.textContent = '⚙ Cài đặt';
++  }
++}
++
++function detectLocation() {
++  if (!navigator.geolocation) { alert('Trình duyệt không hỗ trợ định vị.'); return; }
++  const badge = document.getElementById('sl-badge');
++  badge.textContent = '📡 Đang xác định vị trí...';
++  navigator.geolocation.getCurrentPosition(
++    pos => setStartLocation(pos.coords.latitude, pos.coords.longitude, '📡 Vị trí của tôi'),
++    err => { badge.textContent = '🏔 Mặc định: Trung tâm Đà Lạt'; alert('Không lấy được vị trí: ' + err.message); },
++    { timeout: 8000 }
++  );
++}
++
++function pickOnMap() {
++  pickingStartLocation = true;
++  document.getElementById('sl-badge').textContent = '🖱 Bấm vào bản đồ để chọn điểm xuất phát...';
++  map.getContainer().style.cursor = 'crosshair';
++}
++
++function setStartLocation(lat, lng, label) {
++  startLocation = { lat, lng };
++  document.getElementById('sl-badge').innerHTML = '📍 ' + label + ' (' + lat.toFixed(4) + ', ' + lng.toFixed(4) + ')';
++  document.getElementById('sl-clear').style.display = 'block';
++  if (startMarker) map.removeLayer(startMarker);
++  const icon = L.divIcon({ className: '', html: '<div style="background:#d4b87a;color:#0a0c12;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);">🏁</div>', iconSize:[28,28], iconAnchor:[14,14] });
++  startMarker = L.marker([lat, lng], {icon}).bindPopup('📍 Điểm xuất phát').addTo(map);
++  map.setView([lat, lng], 15);
++}
++
++function clearStartLocation() {
++  startLocation = null;
++  document.getElementById('sl-badge').textContent = '🏔 Mặc định: Trung tâm Đà Lạt';
++  document.getElementById('sl-clear').style.display = 'none';
++  if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
++}
++
++map.on('click', function(e) {
++  if (!pickingStartLocation) return;
++  pickingStartLocation = false;
++  map.getContainer().style.cursor = '';
++  setStartLocation(e.latlng.lat, e.latlng.lng, 'Điểm chọn trên bản đồ');
++});
++
++fetch('/api/poi_types').then(r=>r.json()).then(types => {
++  const container = document.getElementById('type-filters');
++  types.forEach(t => {
++    const pill = document.createElement('div');
++    pill.className = 'type-pill';
++    pill.dataset.type = t.value;
++    pill.textContent = t.emoji + ' ' + t.label;
++    pill.onclick = () => toggleType(t.value, pill);
++    container.appendChild(pill);
++  });
++});
++
++function toggleType(type, pill) {
++  if (type === 'all') {
++    selectedTypes.clear();
++    document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
++    pill.classList.add('active');
++    return;
++  }
++  document.querySelector('[data-type=all]').classList.remove('active');
++  if (selectedTypes.has(type)) {
++    selectedTypes.delete(type);
++    pill.classList.remove('active');
++    if (selectedTypes.size === 0) document.querySelector('[data-type=all]').classList.add('active');
++  } else {
++    selectedTypes.add(type);
++    pill.classList.add('active');
++  }
++}
++
++let anchorDebounce;
++async function searchAnchor(q) {
++  clearTimeout(anchorDebounce);
++  const drop = document.getElementById('anchor-drop');
++  if (!q.trim()) { drop.style.display='none'; return; }
++  anchorDebounce = setTimeout(async () => {
++    const res = await fetch('/api/search_poi?q='+encodeURIComponent(q));
++    const items = await res.json();
++    if (!items.length) { drop.style.display='none'; return; }
++    drop.innerHTML = items.map(it => `<div class="anchor-drop-item" onclick="addAnchor('${esc(it.name)}','${it.emoji}','${esc(it.type)}')"><span>${it.emoji}</span><span style="flex:1">${it.name}</span><span style="color:var(--text-muted);font-size:11px">⭐${it.rating}</span></div>`).join('');
++    drop.style.display='block';
++  }, 220);
++}
++function addAnchor(name, emoji, type_vi) {
++  if (anchorPOIs.find(a=>a.name===name)) { closeAnchorDrop(); return; }
++  anchorPOIs.push({name, emoji, type_vi});
++  renderAnchorTags();
++  document.getElementById('anchor-input').value = '';
++  closeAnchorDrop();
++}
++function removeAnchor(name) { anchorPOIs = anchorPOIs.filter(a=>a.name!==name); renderAnchorTags(); }
++function renderAnchorTags() {
++  const container = document.getElementById('anchor-tags');
++  container.innerHTML = anchorPOIs.map(a => `<div class="anchor-tag">${a.emoji} ${a.name}<button onclick="removeAnchor('${esc(a.name)}')">×</button></div>`).join('');
++}
++function closeAnchorDrop() { document.getElementById('anchor-drop').style.display='none'; }
++document.addEventListener('click', e => { if (!e.target.closest('#anchor-section')) closeAnchorDrop(); });
++document.getElementById('anchor-input').addEventListener('input', e => searchAnchor(e.target.value));
++document.getElementById('anchor-input').addEventListener('keydown', e => { if(e.key==='Escape') closeAnchorDrop(); });
++
++async function optimize() {
++  const btn = document.getElementById('btn-optimize');
++  btn.disabled = true;
++  document.getElementById('loading').classList.add('show');
++  const preferences = {
++    adventure: document.getElementById('pref_adventure').checked,
++    relax: document.getElementById('pref_relax').checked,
++    food: document.getElementById('pref_food').checked,
++    checkin: document.getElementById('pref_checkin').checked,
++  };
++  const payload = {
++    num_days: parseInt(document.getElementById('num_days').value),
++    top_k: parseInt(document.getElementById('top_k').value),
++    start_hour: parseInt(document.getElementById('start_hour').value),
++    end_hour: parseInt(document.getElementById('end_hour').value),
++    types: [...selectedTypes],
++    anchor_pois: anchorPOIs.map(a=>a.name),
++    preferences: preferences,
++    start_location: startLocation,
++  };
++  try {
++    const res = await fetch('/api/optimize', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
++    const data = await res.json();
++    renderResult(data);
++    const formSection = document.getElementById('form-section');
++    if (!formSection.classList.contains('collapsed')) {
++      formSection.classList.add('collapsed');
++    }
++    // Hiện nút mở lại form
++    document.getElementById('btn-reopen-form').style.display = 'inline-flex';
++    document.getElementById('feedback-container').style.display = 'block';
++  } catch(e) { alert('Lỗi: '+e.message); }
++  finally { btn.disabled=false; document.getElementById('loading').classList.remove('show'); }
++}
++
++function renderResult(data) {
++  currentRouteId = data.route_id || null;
++  allLayers.forEach(l => map.removeLayer(l));
++  allLayers = [];
++  const s = data.summary;
++  document.getElementById('s-km').innerHTML = s.total_km;
++  document.getElementById('s-rate').innerHTML = s.rate;
++  document.getElementById('s-stops').innerHTML = s.feasible + '/' + s.total_stops;
++  document.getElementById('summary-bar').style.display = 'flex';
++
++  let html = '';
++  data.days.forEach(day => {
++    const travelMins = Math.round(day.km / 30 * 60);
++    html += `<div class="day-section">
++      <div class="day-header" onclick="toggleDay(this)">
++        <div class="day-dot" style="background:${day.color}"></div>
++        <h3>Ngày ${day.day}</h3>
++        <div class="day-stats">
++          <span>🛣️ ${day.km} km</span>
++          <span>🕒 ${travelMins} phút</span>
++          <span>✅ ${day.feasible}/${day.total}</span>
++        </div>
++        <span style="font-size:12px;">▼</span>
++      </div>
++      <div class="day-stops" style="display:block;">`;
++    day.stops.forEach(stop => {
++      const cls = stop.feasible ? '' : ' infeasible';
++      html += `<div class="stop-item${cls}" onclick="focusStop(${stop.lat},${stop.lng},'${esc(stop.name)}')">
++        <div class="stop-num" style="background:${day.color}">${stop.idx}</div>
++        <div class="stop-body">
++          <div class="stop-name">${stop.emoji} ${stop.name} ${stop.anchor ? '<span class="badge-anchor">📌 bắt buộc</span>' : ''}</div>
++          <div class="stop-meta">
++            <span class="stop-time">🕐 ${stop.start} – ${stop.end}</span>
++            <span>${stop.type_vi}</span>
++            ${stop.rating ? `<span>⭐ ${stop.rating}</span>` : ''}
++            ${stop.visit_min ? `<span>⏱ ${stop.visit_min} phút</span>` : ''}
++            ${!stop.feasible ? '<span class="badge-infeasible">⚠️ ngoài giờ</span>' : ''}
++          </div>
++        </div>
++      </div>`;
++    });
++    html += `</div></div>`;
++  });
++  document.getElementById('timeline').innerHTML = html;
++
++  const bounds = [];
++  data.days.forEach(day => {
++    const coords = [];
++    day.stops.forEach(stop => {
++      const latlng = [stop.lat, stop.lng];
++      coords.push(latlng);
++      bounds.push(latlng);
++      const icon = L.divIcon({ className: '', html: `<div style="background:${day.color};color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);opacity:${stop.feasible?1:0.45};">${stop.idx}</div>`, iconSize:[32,32], iconAnchor:[16,16] });
++      const popupHtml = `<div class="map-popup"><b>${stop.name}</b><br><div class="meta">${stop.emoji} ${stop.type_vi} | Ngày ${day.day} #${stop.idx}</div>🕐 ${stop.start}–${stop.end} ${stop.feasible?'✅':'⚠️'}<br>⭐ <span class="rating-stars">${'★'.repeat(Math.round(stop.rating))}${'☆'.repeat(5-Math.round(stop.rating))}</span><br>${stop.address?`📍 ${stop.address.substring(0,60)}<br>`:''}${stop.video_url?`<a href="${stop.video_url}" target="_blank">🎬 TikTok</a>`:''}</div>`;
++      const marker = L.marker(latlng, {icon}).bindPopup(popupHtml, {maxWidth:280}).addTo(map);
++      allLayers.push(marker);
++    });
++    if (coords.length >= 2) {
++      // Lấy polyline thực tế từ OSRM
++      fetch("/api/route_polyline", {
++        method: "POST",
++        headers: {"Content-Type": "application/json"},
++        body: JSON.stringify({ coords: coords.map(c => ({ lat: c[0], lng: c[1] })) })
++      })
++      .then(r => r.json())
++      .then(data => {
++        const points = data.polyline && data.polyline.length > 0 ? data.polyline : coords;
++        const line = L.polyline(points, { color: day.color, weight: 4, opacity: 0.8, dashArray: '8 6', lineCap: 'round', lineJoin: 'round' }).addTo(map);
++        allLayers.push(line);
++      });
++    }
++  });
++  if (bounds.length) map.fitBounds(bounds, {padding:[40,40]});
++  if (startMarker) startMarker.addTo(map);
++
++  const weatherBanner = document.getElementById('weather-banner');
++  if (data.weather && data.weather.outdoor_removed) {
++    const rainyCount = data.weather.rainy_days.filter(Boolean).length;
++    const total = data.weather.rainy_days.length;
++    weatherBanner.innerHTML = '🌧 Dự báo mưa ' + rainyCount + '/' + total + ' ngày — đã ẩn địa điểm ngoài trời (núi, thác, check-in). Bỏ tick sở thích Mạo hiểm để xem thêm.';
++    weatherBanner.style.display = 'block';
++  } else {
++    weatherBanner.style.display = 'none';
++  }
++
++  // Cập nhật trọng số nếu server trả về
++  if (data.weights) {
++    renderWeightPanel(data.weights);
++    showWeightToast(data.weights);
++  }
++}
++
++function toggleDay(header) {
++  const stopsDiv = header.nextElementSibling;
++  if (stopsDiv.style.display === 'none') stopsDiv.style.display = 'block';
++  else stopsDiv.style.display = 'none';
++}
++function focusStop(lat, lng, name) {
++  map.setView([lat, lng], 16);
++  allLayers.forEach(l => { if (l.getLatLng && Math.abs(l.getLatLng().lat-lat)<0.0001) l.openPopup(); });
++}
++function esc(s) { return (s||'').replace(/'/g,"\\'"); }
++
++// Khởi tạo sự kiện cho các sao
++function initStars() {
++  const stars = document.querySelectorAll('.star');
++  stars.forEach(star => {
++    star.addEventListener('click', () => {
++      const value = parseInt(star.dataset.value);
++      selectedRating = value;
++      stars.forEach((s, idx) => {
++        if (idx < value) s.classList.add('selected');
++        else s.classList.remove('selected');
++      });
++    });
++  });
++}
++initStars();
++
++async function submitFeedback() {
++  if (selectedRating === 0) {
++    alert('Vui lòng chọn số sao đánh giá!');
++    return;
++  }
++  const feedback = document.getElementById("feedbackText").value;
++  const response = await fetch("/submit-feedback", {
++    method: "POST",
++    headers: { "Content-Type": "application/json" },
++    body: JSON.stringify({ rating: selectedRating, feedback: feedback, route_id: currentRouteId })
++  });
++  const result = await response.json();
++  document.getElementById("feedbackMessage").innerText = result.message;
++  dismissFeedback();
++  selectedRating = 0;
++  document.getElementById("feedbackText").value = '';
++  document.querySelectorAll('.star').forEach(s => s.classList.remove('selected'));
++  document.getElementById("thankPopup").style.display = "flex";
++}
++function dismissFeedback() {
++  const fc = document.getElementById('feedback-container');
++  fc.style.transition = 'opacity 0.25s, transform 0.25s';
++  fc.style.opacity = '0';
++  fc.style.transform = 'translateY(10px)';
++  setTimeout(() => { fc.style.display = 'none'; fc.style.opacity = ''; fc.style.transform = ''; }, 260);
++}
++function closePopup() { document.getElementById("thankPopup").style.display = "none"; }
++
++// ── Drag & drop cho feedback card ──────────────────────────────
++(function initFeedbackDrag() {
++  const fc = document.getElementById('feedback-container');
++  const handle = document.getElementById('feedback-drag-handle');
++  let dragging = false, ox = 0, oy = 0;
++
++  handle.addEventListener('mousedown', e => {
++    dragging = true;
++    // Nếu đang dùng bottom/right, chuyển sang top/left tuyệt đối
++    if (fc.style.top === '') {
++      const rect = fc.getBoundingClientRect();
++      fc.style.top  = rect.top  + 'px';
++      fc.style.left = rect.left + 'px';
++      fc.style.bottom = 'unset';
++      fc.style.right  = 'unset';
++    }
++    ox = e.clientX - fc.getBoundingClientRect().left;
++    oy = e.clientY - fc.getBoundingClientRect().top;
++    fc.style.transition = 'none';
++    fc.style.userSelect = 'none';
++    e.preventDefault();
++  });
++
++  // Touch support
++  handle.addEventListener('touchstart', e => {
++    const t = e.touches[0];
++    dragging = true;
++    if (fc.style.top === '') {
++      const rect = fc.getBoundingClientRect();
++      fc.style.top  = rect.top  + 'px';
++      fc.style.left = rect.left + 'px';
++      fc.style.bottom = 'unset';
++      fc.style.right  = 'unset';
++    }
++    ox = t.clientX - fc.getBoundingClientRect().left;
++    oy = t.clientY - fc.getBoundingClientRect().top;
++    fc.style.transition = 'none';
++    e.preventDefault();
++  }, { passive: false });
++
++  function onMove(cx, cy) {
++    if (!dragging) return;
++    let nx = cx - ox;
++    let ny = cy - oy;
++    // Giữ trong viewport
++    nx = Math.max(0, Math.min(window.innerWidth  - fc.offsetWidth,  nx));
++    ny = Math.max(0, Math.min(window.innerHeight - fc.offsetHeight, ny));
++    fc.style.left = nx + 'px';
++    fc.style.top  = ny + 'px';
++  }
++
++  document.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
++  document.addEventListener('touchmove', e => { if(dragging) onMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
++
++  function stopDrag() {
++    dragging = false;
++    fc.style.userSelect = '';
++  }
++  document.addEventListener('mouseup',  stopDrag);
++  document.addEventListener('touchend', stopDrag);
++})();
++
++// ── Trọng số cá nhân ──────────────────────────────────────────
++// Chuyển weight (0.5-2.0) → % thanh (0-100%)
++function weightToPct(w) { return Math.round(((w - 0.5) / 1.5) * 100); }
++
++let _prevWeights = null;
++let _toastTimer = null;
++
++function renderWeightPanel(w) {
++  const panel = document.getElementById('weights-panel');
++  panel.style.display = 'block';
++  const cats = ['cafe','nature','food','checkin'];
++  cats.forEach(c => {
++    const pct = weightToPct(w[c]);
++    document.getElementById(`wb-${c}`).style.width = pct + '%';
++    document.getElementById(`wv-${c}`).textContent = w[c].toFixed(2);
++  });
++}
++
++function showWeightToast(w) {
++  const cats = ['cafe','nature','food','checkin'];
++  cats.forEach(c => {
++    const pct = weightToPct(w[c]);
++    document.getElementById(`twb-${c}`).style.width = pct + '%';
++    document.getElementById(`twv-${c}`).textContent = w[c].toFixed(2);
++    let arrow = '';
++    if (_prevWeights) {
++      if (w[c] > _prevWeights[c]) arrow = '<span style="color:#4ade80">↑</span>';
++      else if (w[c] < _prevWeights[c]) arrow = '<span style="color:#f87171">↓</span>';
++    }
++    document.getElementById(`twa-${c}`).innerHTML = arrow;
++  });
++  _prevWeights = {...w};
++
++  const toast = document.getElementById('weight-toast');
++  toast.classList.add('show');
++  if (_toastTimer) clearTimeout(_toastTimer);
++  _toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
++}
++
++async function loadInitialWeights() {
++  try {
++    const res = await fetch('/api/user_weights');
++    const w = await res.json();
++    _prevWeights = {...w};
++    renderWeightPanel(w);
++  } catch(e) { console.warn('Không tải được trọng số:', e); }
++}
++
++async function resetWeights() {
++  try {
++    const res = await fetch('/api/user_weights/reset', { method: 'POST' });
++    const data = await res.json();
++    if (data.success) {
++      renderWeightPanel(data.weights);
++      showWeightToast(data.weights);
++    }
++  } catch(e) { console.warn('Reset thất bại:', e); }
++}
++
++// Tải weights khi khởi động
++loadInitialWeights();
+diff --git a/webapp/templates/index.html b/webapp/templates/index.html
+new file mode 100644
+index 0000000..5c9586e
+--- /dev/null
++++ b/webapp/templates/index.html
+@@ -0,0 +1,133 @@
++<!DOCTYPE html>
++<html lang="vi">
++<head>
++<meta charset="UTF-8">
++<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
++<title>Đà Lạt Route Planner</title>
++<link rel="preconnect" href="https://fonts.googleapis.com">
++<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
++<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
++<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
++<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
++</head>
++<body>
++
++<div id="sidebar">
++  <div class="sidebar-header">
++    <h1>🏔 Đà Lạt Planner</h1>
++  </div>
++  <div id="form-section" style="max-height: 500px;">
++    <div id="form-inner">
++      <div class="form-row-compact">
++        <div class="form-group"><label>Số ngày</label><input type="number" id="num_days" value="3" min="1" max="5"></div>
++        <div class="form-group"><label>Số POI</label><input type="number" id="top_k" value="40" min="10" max="80"></div>
++        <div class="form-group"><label>Bắt đầu</label><select id="start_hour"><option value="6">06:00</option><option value="7" selected>07:00</option><option value="8">08:00</option><option value="9">09:00</option></select></div>
++        <div class="form-group"><label>Kết thúc</label><select id="end_hour"><option value="19">19:00</option><option value="20">20:00</option><option value="21" selected>21:00</option><option value="22">22:00</option></select></div>
++      </div>
++      <label>🧭 Sở thích du lịch</label>
++      <div class="preference-group">
++        <label><input type="checkbox" id="pref_adventure"> 🏔 Mạo hiểm</label>
++        <label><input type="checkbox" id="pref_relax"> 🌿 Thư giãn</label>
++        <label><input type="checkbox" id="pref_food"> 🍜 Ăn uống</label>
++        <label><input type="checkbox" id="pref_checkin"> 📸 Check-in</label>
++      </div>
++      <label>Loại địa điểm</label>
++      <div id="type-filters"><div class="type-pill active" data-type="all">✨ Tất cả</div></div>
++      <label>📌 Điểm bắt buộc</label>
++      <div id="anchor-section">
++        <div style="position:relative;"><input type="text" id="anchor-input" placeholder="Tìm địa điểm..." autocomplete="off"><div id="anchor-drop"></div></div>
++        <div id="anchor-tags" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;"></div>
++      </div>
++      <div id="start-location-section">
++        <label>📍 Điểm xuất phát</label>
++        <div class="sl-row">
++          <div class="sl-badge" id="sl-badge">🏔 Mặc định: Trung tâm Đà Lạt</div>
++          <button class="sl-btn" onclick="detectLocation()">📡 Vị trí của tôi</button>
++          <button class="sl-btn" onclick="pickOnMap()">🗺 Chọn trên bản đồ</button>
++          <button class="sl-btn" id="sl-clear" onclick="clearStartLocation()" style="display:none;">✕</button>
++        </div>
++      </div>
++      <button id="btn-optimize" onclick="optimize()">🗺 Tối ưu lộ trình</button>
++    </div>
++  </div>
++
++  <div id="summary-bar" style="display:none;">
++    <div class="summary-item"><div class="label">Tổng km</div><div class="value" id="s-km">-</div><div class="unit">km</div></div>
++    <div class="summary-item"><div class="label">Đúng giờ</div><div class="value" id="s-rate">-</div><div class="unit">%</div></div>
++    <div class="summary-item"><div class="label">Địa điểm</div><div class="value" id="s-stops">-</div><div class="unit">/ -</div></div>
++    <button id="btn-reopen-form" onclick="toggleForm()" style="display:none;align-self:center;background:rgba(212,184,122,0.15);border:1px solid var(--accent);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--accent);cursor:pointer;white-space:nowrap;">⚙ Cài đặt</button>
++  </div>
++
++  <div id="weather-banner"></div>
++  <div id="timeline">
++    <div style="padding:40px 20px; text-align:center; color:var(--text-muted);">⬅️ Nhập thông tin và bấm tạo lộ trình</div>
++  </div>
++
++  <!-- Panel trọng số cá nhân — nằm dưới timeline -->
++  <div id="weights-panel">
++    <div class="wp-header">
++      <span class="wp-title">🧠 Trọng số sở thích của bạn</span>
++      <button class="wp-reset" onclick="resetWeights()">↺ Reset</button>
++    </div>
++    <div class="weight-row"><span>☕ Cà phê</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-cafe" style="width:50%"></div></div><span class="weight-val" id="wv-cafe">1.00</span></div>
++    <div class="weight-row"><span>🌿 Thiên nhiên</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-nature" style="width:50%"></div></div><span class="weight-val" id="wv-nature">1.00</span></div>
++    <div class="weight-row"><span>🍜 Ăn uống</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-food" style="width:50%"></div></div><span class="weight-val" id="wv-food">1.00</span></div>
++    <div class="weight-row"><span>📸 Check-in</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-checkin" style="width:50%"></div></div><span class="weight-val" id="wv-checkin">1.00</span></div>
++  </div>
++
++</div>
++
++<!-- Feedback floating card (ngoài sidebar, fixed góc trái dưới) -->
++<div id="feedback-container">
++  <div class="feedback-box">
++    <div id="feedback-drag-handle">
++      <span>⭐ Đánh giá hành trình</span>
++      <button class="feedback-dismiss" onclick="dismissFeedback()" title="Bỏ qua">✕</button>
++    </div>
++    <div class="feedback-body">
++    <div class="stars">
++      <span class="star" data-value="1">⭐</span>
++      <span class="star" data-value="2">⭐</span>
++      <span class="star" data-value="3">⭐</span>
++      <span class="star" data-value="4">⭐</span>
++      <span class="star" data-value="5">⭐</span>
++    </div>
++    <textarea id="feedbackText" placeholder="Chia sẻ trải nghiệm của bạn..." style="width:100%;min-height:64px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;font-size:12px;font-family:inherit;resize:none;"></textarea>
++    <button onclick="submitFeedback()" style="margin-top:8px;width:100%;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#0a0c12;border:none;border-radius:8px;padding:9px;font-weight:700;cursor:pointer;font-size:13px;">Gửi đánh giá</button>
++    <p id="feedbackMessage" style="margin-top:6px;color:var(--text-muted);font-size:11px;"></p>
++    </div>
++  </div>
++</div>
++
++<div id="map-container">
++  <div id="loading"><div class="spinner"></div><p>Đang tính toán lộ trình...</p></div>
++  <div id="map"></div>
++</div>
++
++<!-- Toast trọng số -->
++<div id="weight-toast">
++  <div class="toast-title">🧠 Hồ sơ sở thích đã cập nhật</div>
++  <div class="weight-row"><span>☕ Cà phê</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-cafe" style="width:50%"></div></div><span class="weight-arrow" id="twa-cafe"></span><span class="weight-val" id="twv-cafe">1.00</span></div>
++  <div class="weight-row"><span>🌿 Thiên nhiên</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-nature" style="width:50%"></div></div><span class="weight-arrow" id="twa-nature"></span><span class="weight-val" id="twv-nature">1.00</span></div>
++  <div class="weight-row"><span>🍜 Ăn uống</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-food" style="width:50%"></div></div><span class="weight-arrow" id="twa-food"></span><span class="weight-val" id="twv-food">1.00</span></div>
++  <div class="weight-row"><span>📸 Check-in</span><div class="weight-bar-bg"><div class="weight-bar-fill" id="twb-checkin" style="width:50%"></div></div><span class="weight-arrow" id="twa-checkin"></span><span class="weight-val" id="twv-checkin">1.00</span></div>
++</div>
++
++<div id="thankPopup" class="popup">
++  <div class="popup-content">
++    <h2>💖 Cảm ơn bạn!</h2>
++    <p>Chúc bạn có trải nghiệm tuyệt vời cùng TikTokRoute!</p>
++    <button onclick="closePopup()">Đóng</button>
++  </div>
++</div>
++
++<script>
++  // Truyền user_token (đọc từ cookie phía server) sang file JS tĩnh —
++  // static/js/app.js không đi qua Jinja nên không thể chèn biến Jinja vào
++  // đó trực tiếp; đây là cầu nối nhỏ gọn thay cho cách cũ (nhúng thẳng
++  // trong <script> giữa file app.py).
++  window.USER_TOKEN = "{{ user_token }}";
++</script>
++<script src="{{ url_for('static', filename='js/app.js') }}"></script>
++</body>
++</html>
