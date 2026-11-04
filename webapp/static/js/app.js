@@ -3,7 +3,10 @@
 // {{ user_token }} trực tiếp vào đây).
 const USER_TOKEN = window.USER_TOKEN;
 const map = L.map('map', { zoomControl: false }).setView([11.9404, 108.4583], 13);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB', maxZoom: 19 }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  maxZoom: 19,
+}).addTo(map);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 let allLayers = [];
