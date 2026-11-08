@@ -3,10 +3,40 @@
 // {{ user_token }} trực tiếp vào đây).
 const USER_TOKEN = window.USER_TOKEN;
 const map = L.map('map', { zoomControl: false }).setView([11.9404, 108.4583], 13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  maxZoom: 19,
-}).addTo(map);
+const tileProviders = [
+  {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    options: {
+      attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Sources: Esri, TomTom, Garmin, FAO, NOAA, USGS, OpenStreetMap contributors, and the GIS User Community',
+      maxZoom: 19,
+    },
+  },
+  {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    options: {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+    },
+  },
+];
+let activeTileLayer;
+function useTileProvider(index) {
+  const provider = tileProviders[index];
+  if (!provider) {
+    console.error('All map tile providers failed to load.');
+    return;
+  }
+  if (activeTileLayer) map.removeLayer(activeTileLayer);
+  const tileLayer = L.tileLayer(provider.url, provider.options);
+  activeTileLayer = tileLayer;
+  tileLayer.on('tileerror', () => {
+    if (activeTileLayer === tileLayer) {
+      useTileProvider(index + 1);
+    }
+  });
+  tileLayer.addTo(map);
+}
+useTileProvider(0);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 let allLayers = [];
